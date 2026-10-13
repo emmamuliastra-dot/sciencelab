@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Biology Lockdown</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escape Room</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
 <style>
-/* Layout: one centred column. Title, sticky HUD, pixel-art lab scene, door tracker, then the active panel (start / quiz / end). */
+/* Layout: one phone-sized column that always fits a single screen. Title row and HUD on top, the lab scene flexes to take the spare height, then the door tracker and the active panel (start / quiz / end) at the bottom. */
 :root {
   --bg: #070c0f;
   --panel: #0e171b;
@@ -23,15 +23,17 @@
   --body: 'VT323', 'Courier New', monospace;
   color-scheme: dark;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
-html, body { margin: 0; }
+html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg);
   color: var(--ink);
-  font: 22px/1.25 var(--body);
-  padding-block: 16px 48px;
-  padding-inline: 16px;
+  font: 20px/1.2 var(--body);
+  padding-block: 8px;
+  padding-inline: 12px;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 /* CRT scanlines */
 body::before {
@@ -42,86 +44,81 @@ body::before {
   z-index: 50;
   background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .16) 2px 3px);
 }
-.game { max-width: 880px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
+.game { max-width: 460px; height: 100%; margin-inline: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* Title */
-.title { display: flex; flex-direction: column; gap: 8px; }
+/* Title row */
+.top { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 h1 {
   margin: 0;
-  font: 400 clamp(16px, 4.4vw, 30px)/1.3 var(--px);
-  letter-spacing: .04em;
-  text-wrap: balance;
-  text-shadow: 0 0 14px rgba(55, 245, 181, .55), 3px 3px 0 var(--neon-deep);
+  font: 400 clamp(14px, 5vw, 20px)/1.2 var(--px);
+  letter-spacing: .06em;
+  text-shadow: 0 0 12px rgba(55, 245, 181, .55), 2px 2px 0 var(--neon-deep);
 }
-.tag { font: 400 10px/1.6 var(--px); color: var(--neon); letter-spacing: .14em; }
 
 /* Pixel buttons */
 .pbtn {
-  font: 400 11px/1 var(--px);
-  letter-spacing: .06em;
+  font: 400 10px/1 var(--px);
+  letter-spacing: .05em;
   color: var(--ink);
   background: var(--panel-2);
   border: 0;
   min-height: 44px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  box-shadow: 0 0 0 3px var(--edge), inset -4px -4px 0 rgba(0, 0, 0, .35), inset 4px 4px 0 rgba(255, 255, 255, .08);
+  gap: 8px;
+  box-shadow: 0 0 0 2px var(--edge), inset -3px -3px 0 rgba(0, 0, 0, .35), inset 3px 3px 0 rgba(255, 255, 255, .08);
 }
+.pbtn.small { min-height: 34px; padding: 8px 10px; font-size: 8px; }
 .pbtn:hover:not(:disabled) { background: #1d333c; }
 .pbtn:active:not(:disabled) { transform: translateY(2px); }
 .pbtn:disabled { opacity: .4; cursor: not-allowed; }
-.pbtn:focus-visible, .diff-opt input:focus-visible + span { outline: 3px dashed var(--neon); outline-offset: 4px; }
-.pbtn.primary { background: var(--neon); color: #03140e; box-shadow: 0 0 0 3px var(--neon-deep), inset -4px -4px 0 rgba(0, 0, 0, .25), inset 4px 4px 0 rgba(255, 255, 255, .35), 0 0 22px rgba(55, 245, 181, .35); }
+.pbtn:focus-visible, .diff-opt input:focus-visible + span { outline: 3px dashed var(--neon); outline-offset: 3px; }
+.pbtn.primary { background: var(--neon); color: #03140e; box-shadow: 0 0 0 2px var(--neon-deep), inset -3px -3px 0 rgba(0, 0, 0, .25), inset 3px 3px 0 rgba(255, 255, 255, .35), 0 0 18px rgba(55, 245, 181, .35); }
 .pbtn.primary:hover:not(:disabled) { background: #6dffc9; }
 
 /* HUD */
 .hud {
-  position: sticky;
-  top: env(safe-area-inset-top, 0px);
-  z-index: 10;
+  flex: none;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 16px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 6px 10px;
   background: var(--panel);
-  box-shadow: 0 0 0 3px var(--edge), 0 6px 0 3px var(--bg);
+  box-shadow: 0 0 0 2px var(--edge);
 }
-.hud-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.lbl { font: 400 8px/1 var(--px); color: var(--dim); letter-spacing: .14em; }
-#hearts { display: flex; gap: 6px; }
-.heart { width: 28px; height: 24px; display: block; }
+.hud-cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.lbl { font: 400 7px/1 var(--px); color: var(--dim); letter-spacing: .14em; }
+#hearts { display: flex; gap: 5px; }
+.heart { width: 22px; height: 19px; display: block; }
 .heart.full rect { fill: var(--bad); }
 .heart.full rect.hl { fill: #fff; opacity: .65; }
 .heart.empty rect { fill: #2a2030; }
 .heart.lost { animation: heartLoss .8s steps(2, end); }
 @keyframes heartLoss { 0% { transform: scale(1.5); filter: brightness(2); } 50% { transform: scale(1.2); filter: brightness(1); } 100% { transform: scale(1); } }
-#timer { font: 400 22px/1 var(--px); font-variant-numeric: tabular-nums; color: var(--neon); text-shadow: 0 0 10px rgba(55, 245, 181, .5); }
+#timer { font: 400 18px/1 var(--px); font-variant-numeric: tabular-nums; color: var(--neon); text-shadow: 0 0 10px rgba(55, 245, 181, .5); }
 #timer.warn { color: var(--warn); text-shadow: 0 0 10px rgba(255, 209, 102, .5); }
 #timer.crit { color: var(--bad); animation: blink 1s steps(2, end) infinite; }
 @keyframes blink { 50% { opacity: .35; } }
-.hud-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
 .pips { display: inline-flex; gap: 3px; }
-.pip { width: 8px; height: 8px; background: var(--warn); }
+.pip { width: 7px; height: 7px; background: var(--warn); }
 .pip.off { background: #3a3320; }
 
-/* Scene */
-.scene-wrap { margin: 0; position: relative; box-shadow: 0 0 0 4px var(--edge), 0 0 0 8px var(--bg), 0 0 32px rgba(55, 245, 181, .18); background: #000; }
-#scene { display: block; width: 100%; height: auto; aspect-ratio: 160 / 96; image-rendering: pixelated; }
+/* Scene: fills whatever height is left on the screen */
+.scene-wrap { flex: 1 1 0; min-height: 88px; position: relative; margin: 0; overflow: hidden; background: #0a1216; box-shadow: 0 0 0 3px var(--edge), 0 0 20px rgba(55, 245, 181, .15); }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .caption {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
-  max-width: calc(100% - 16px);
-  padding: 7px 9px;
-  font: 400 9px/1.4 var(--px);
-  letter-spacing: .1em;
+  left: 6px;
+  bottom: 6px;
+  max-width: calc(100% - 12px);
+  padding: 5px 7px;
+  font: 400 7px/1.4 var(--px);
+  letter-spacing: .08em;
   color: var(--neon);
   background: rgba(7, 12, 15, .85);
   box-shadow: 0 0 0 2px var(--neon-deep);
@@ -130,96 +127,105 @@ h1 {
 @keyframes capPulse { 0%, 50% { background: var(--neon); color: #03140e; } 100% { } }
 
 /* Door tracker */
-.tracker { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-.tracker li { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; background: var(--panel); box-shadow: 0 0 0 2px var(--edge); min-width: 0; }
-.tracker canvas { width: 36px; height: 48px; image-rendering: pixelated; }
-.tracker .name { font: 400 clamp(14px, 3.7vw, 18px)/1 var(--body); color: var(--dim); text-align: center; }
+.tracker { flex: none; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.tracker li { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 2px 4px; background: var(--panel); box-shadow: 0 0 0 2px var(--edge); min-width: 0; }
+.tracker canvas { width: 24px; height: 32px; image-rendering: pixelated; }
+.tracker .name { font: 400 14px/1 var(--body); color: var(--dim); text-align: center; }
 .tracker .dots { display: flex; gap: 3px; }
-.tracker .dot { width: 7px; height: 7px; background: #1f3037; }
+.tracker .dot { width: 6px; height: 6px; background: #1f3037; }
 .tracker .dot.on { background: var(--neon); }
-.tracker li.is-current { box-shadow: 0 0 0 2px var(--neon), 0 0 18px rgba(55, 245, 181, .4); }
+.tracker li.is-current { box-shadow: 0 0 0 2px var(--neon), 0 0 14px rgba(55, 245, 181, .4); }
 .tracker li.is-current .name { color: var(--ink); }
 .tracker li.is-open .name { color: var(--neon); }
-@media (min-width: 560px) { .tracker canvas { width: 48px; height: 64px; } .tracker .name { font-size: 22px; } }
 
-/* Panels */
-.panel { background: var(--panel); padding: 20px 18px; box-shadow: 0 0 0 3px var(--edge); display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.panel h2 { margin: 0; font: 400 clamp(13px, 3.2vw, 18px)/1.5 var(--px); letter-spacing: .04em; text-wrap: balance; }
-.intro { font-size: 28px; line-height: 1.15; margin: 0; max-width: 34ch; text-shadow: 0 0 10px rgba(55, 245, 181, .25); }
-.rules { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--dim); font-size: 22px; }
-.rules li { padding-left: 22px; position: relative; }
-.rules li::before { content: ""; position: absolute; left: 0; top: .42em; width: 10px; height: 10px; background: var(--neon); }
-fieldset.diff { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 12px; }
-fieldset.diff legend { font: 400 9px/1 var(--px); color: var(--dim); letter-spacing: .14em; padding: 0; margin-bottom: 12px; }
-.diff-opt { flex: 1 1 140px; position: relative; cursor: pointer; }
+/* Panels (bottom of the screen). Content scrolls inside only if a screen is extremely short. */
+.panel { flex: 0 1 auto; min-height: 0; overflow-y: auto; background: var(--panel); padding: 10px 12px 12px; box-shadow: 0 0 0 2px var(--edge); display: flex; flex-direction: column; gap: 10px; }
+.panel h2 { margin: 0; font: 400 clamp(10px, 3.4vw, 13px)/1.5 var(--px); letter-spacing: .04em; }
+.intro { font-size: 22px; line-height: 1.1; margin: 0; text-shadow: 0 0 10px rgba(55, 245, 181, .25); }
+.rules { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; color: var(--dim); font-size: 19px; line-height: 1.05; }
+.rules li { padding-left: 16px; position: relative; }
+.rules li::before { content: ""; position: absolute; left: 0; top: .32em; width: 8px; height: 8px; background: var(--neon); }
+fieldset.diff { border: 0; margin: 0; padding: 0; display: flex; gap: 8px; min-width: 0; }
+fieldset.diff legend { font: 400 7px/1 var(--px); color: var(--dim); letter-spacing: .14em; padding: 0; margin-bottom: 8px; }
+.diff-opt { flex: 1 1 0; position: relative; cursor: pointer; min-width: 0; }
 .diff-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-.diff-opt span { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 14px 8px; font: 400 12px/1 var(--px); background: var(--panel-2); box-shadow: 0 0 0 3px var(--edge); }
-.diff-opt small { font: 400 20px/1 var(--body); color: var(--dim); font-variant-numeric: tabular-nums; }
-.diff-opt input:checked + span { background: #0f3d34; box-shadow: 0 0 0 3px var(--neon), 0 0 18px rgba(55, 245, 181, .35); color: var(--neon); }
+.diff-opt span { display: flex; flex-direction: column; gap: 6px; align-items: center; padding: 10px 4px; min-height: 48px; font: 400 9px/1 var(--px); background: var(--panel-2); box-shadow: 0 0 0 2px var(--edge); }
+.diff-opt small { font: 400 18px/1 var(--body); color: var(--dim); font-variant-numeric: tabular-nums; }
+.diff-opt input:checked + span { background: #0f3d34; box-shadow: 0 0 0 2px var(--neon), 0 0 14px rgba(55, 245, 181, .35); color: var(--neon); }
 .diff-opt input:checked + span small { color: var(--ink); }
 .start-actions { display: flex; }
-.start-actions .pbtn { width: 100%; font-size: 13px; padding-block: 18px; }
+.start-actions .pbtn { width: 100%; font-size: 11px; min-height: 48px; }
 
 /* Quiz */
-.q-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; font: 400 9px/1.5 var(--px); letter-spacing: .1em; color: var(--neon); }
-#qText { font: 400 30px/1.1 var(--body); letter-spacing: 0; margin: 0; text-wrap: pretty; outline: none; }
-@media (max-width: 560px) { #qText { font-size: 27px; } }
-.opts { display: grid; gap: 14px; grid-template-columns: 1fr; padding: 3px; }
-@media (min-width: 720px) { .opts { grid-template-columns: 1fr 1fr; } }
+.q-meta { display: flex; justify-content: space-between; gap: 8px; font: 400 7px/1.4 var(--px); letter-spacing: .08em; color: var(--neon); }
+#qText { font: 400 23px/1.05 var(--body); margin: 0; outline: none; }
+.opts { display: grid; gap: 8px; grid-template-columns: 1fr; padding: 2px; }
 .opt {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   text-align: left;
-  min-height: 62px;
-  padding: 10px 14px;
+  min-height: 44px;
+  padding: 5px 10px;
   font: inherit;
-  font-size: 26px;
-  line-height: 1.1;
+  font-size: 21px;
+  line-height: 1.05;
   color: var(--ink);
   background: var(--panel-2);
   border: 0;
   cursor: pointer;
   min-width: 0;
-  box-shadow: 0 0 0 3px var(--edge), inset -4px -4px 0 rgba(0, 0, 0, .35), inset 4px 4px 0 rgba(255, 255, 255, .07);
+  box-shadow: 0 0 0 2px var(--edge), inset -3px -3px 0 rgba(0, 0, 0, .35), inset 3px 3px 0 rgba(255, 255, 255, .07);
 }
 .opt .txt { min-width: 0; overflow-wrap: anywhere; }
-.opt .key { flex: none; width: 32px; height: 32px; display: grid; place-items: center; font: 400 12px/1 var(--px); color: #03140e; background: var(--neon); }
+.opt .key { flex: none; width: 24px; height: 24px; display: grid; place-items: center; font: 400 10px/1 var(--px); color: #03140e; background: var(--neon); }
 .opt:hover:not(:disabled) { background: #1d333c; }
-.opt:focus-visible { outline: 3px dashed var(--neon); outline-offset: 4px; }
+.opt:focus-visible { outline: 3px dashed var(--neon); outline-offset: 3px; }
 .opt:disabled { cursor: default; }
 .opt.elim { opacity: .35; text-decoration: line-through; }
 .opt.elim .key { background: var(--dim); }
-.opt.correct { background: #0e3a26; color: #eafff0; box-shadow: 0 0 0 3px var(--good), 0 0 22px rgba(88, 255, 138, .5); animation: goodPulse .5s steps(4, end); }
+.opt.correct { background: #0e3a26; color: #eafff0; box-shadow: 0 0 0 2px var(--good), 0 0 18px rgba(88, 255, 138, .5); animation: goodPulse .5s steps(4, end); }
 .opt.correct .key { background: var(--good); }
-.opt.wrong { background: #471828; color: #ffe6ec; box-shadow: 0 0 0 3px var(--bad), 0 0 22px rgba(255, 77, 109, .45); }
+.opt.wrong { background: #471828; color: #ffe6ec; box-shadow: 0 0 0 2px var(--bad), 0 0 18px rgba(255, 77, 109, .45); }
 .opt.wrong .key { background: var(--bad); color: #1a0309; }
 @keyframes goodPulse { 0% { transform: scale(1.03); filter: brightness(1.8); } 100% { transform: scale(1); filter: none; } }
 .shake { animation: shake .45s steps(8, end); }
-@keyframes shake { 0%, 100% { transform: translateX(0); } 15% { transform: translateX(-8px); } 30% { transform: translateX(8px); } 45% { transform: translateX(-6px); } 60% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 15% { transform: translateX(-6px); } 30% { transform: translateX(6px); } 45% { transform: translateX(-4px); } 60% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
 
-.feedback { padding: 14px 16px; background: var(--panel-2); border-left: 8px solid var(--neon); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.feedback { padding: 10px 12px; background: var(--panel-2); border-left: 6px solid var(--neon); display: flex; flex-direction: column; gap: 8px; }
 .feedback.good { border-color: var(--good); }
 .feedback.bad { border-color: var(--bad); }
-.fb-head { font: 400 12px/1.4 var(--px); letter-spacing: .06em; }
+.fb-head { font: 400 9px/1.5 var(--px); letter-spacing: .05em; }
 .feedback.good .fb-head { color: var(--good); }
 .feedback.bad .fb-head { color: var(--bad); }
-.feedback p { margin: 0; font-size: 24px; line-height: 1.15; }
+.feedback p { margin: 0; font-size: 20px; line-height: 1.1; }
+.feedback .pbtn { width: 100%; }
 
 /* End panel */
-.stats { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
-.stat { background: var(--panel-2); padding: 12px; box-shadow: 0 0 0 2px var(--edge); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.stat dt { font: 400 8px/1.4 var(--px); color: var(--dim); letter-spacing: .12em; }
-.stat dd { margin: 0; font: 400 28px/1 var(--body); font-variant-numeric: tabular-nums; }
-.stat dd .heart { width: 22px; height: 19px; display: inline-block; margin-right: 3px; }
-.rank { text-align: center; padding: 16px 12px; background: #0f3d34; box-shadow: 0 0 0 3px var(--neon), 0 0 24px rgba(55, 245, 181, .35); display: flex; flex-direction: column; gap: 8px; }
+.stats { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.stat { background: var(--panel-2); padding: 7px 8px; box-shadow: 0 0 0 2px var(--edge); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stat dt { font: 400 6px/1.4 var(--px); color: var(--dim); letter-spacing: .1em; }
+.stat dd { margin: 0; font: 400 24px/1 var(--body); font-variant-numeric: tabular-nums; }
+.stat dd .heart { width: 15px; height: 13px; display: inline-block; margin-right: 2px; }
+.rank { text-align: center; padding: 10px; background: #0f3d34; box-shadow: 0 0 0 2px var(--neon), 0 0 18px rgba(55, 245, 181, .35); display: flex; flex-direction: column; gap: 6px; }
 .rank .lbl { color: var(--neon); }
-.rank .rank-name { font: 400 clamp(14px, 4vw, 22px)/1.4 var(--px); color: var(--ink); text-wrap: balance; }
-.rank p { margin: 0; color: var(--dim); font-size: 22px; }
-.end-actions { display: flex; flex-wrap: wrap; gap: 14px; }
-.end-actions .pbtn { flex: 1 1 200px; }
-.end-msg { margin: 0; font-size: 26px; line-height: 1.15; }
+.rank .rank-name { font: 400 clamp(11px, 3.8vw, 15px)/1.4 var(--px); color: var(--ink); }
+.rank p { margin: 0; color: var(--dim); font-size: 19px; line-height: 1.05; }
+.end-actions { display: flex; gap: 8px; }
+.end-actions .pbtn { flex: 1 1 0; min-width: 0; }
+.end-msg { margin: 0; font-size: 21px; line-height: 1.05; }
 
+@media (max-height: 700px) {
+  body { padding-block: 6px; }
+  .game { gap: 6px; }
+  #qText { font-size: 20px; }
+  .opt { min-height: 38px; font-size: 18px; padding-block: 3px; }
+  .opts { gap: 6px; }
+  .panel { padding: 8px 10px 10px; gap: 8px; }
+  .tracker .name { display: none; }
+  .hud { padding: 4px 8px; }
+  .rules { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -428,17 +434,83 @@ const QUESTION_BANK = [
   { system: "musculoskeletal", difficulty: "hard",
     question: "Which muscle fibre type has the highest myosin ATPase activity and glycolytic capacity but fatigues quickly?",
     options: ["Type I", "Type IIa", "Type IIx", "Cardiac fibre"], correctIndex: 2,
-    explanation: "Type IIx fibres contract fast and rely on anaerobic glycolysis with few mitochondria, so they fatigue quickly. Type I fibres are slow, oxidative and fatigue-resistant." }
+    explanation: "Type IIx fibres contract fast and rely on anaerobic glycolysis with few mitochondria, so they fatigue quickly. Type I fibres are slow, oxidative and fatigue-resistant." },
+
+  /* ----------------------- MORE QUESTIONS (4 per level in total) ----------------------- */
+  { system: "circulatory", difficulty: "easy",
+    question: "Which blood vessels have walls thin enough for exchange of gases and nutrients with tissues?",
+    options: ["Arteries", "Capillaries", "Veins", "Arterioles"], correctIndex: 1,
+    explanation: "Capillary walls are a single endothelial cell thick, so O2, CO2 and nutrients can diffuse between blood and tissue." },
+  { system: "circulatory", difficulty: "medium",
+    question: "A patient has a blood pressure of 120/80 mmHg. What is the approximate mean arterial pressure (MAP)?",
+    options: ["93 mmHg", "100 mmHg", "80 mmHg", "107 mmHg"], correctIndex: 0,
+    explanation: "MAP ≈ diastolic + one third of the pulse pressure = 80 + (40 ÷ 3) ≈ 93 mmHg, because the heart spends longer in diastole than systole." },
+  { system: "circulatory", difficulty: "hard",
+    question: "What does the dicrotic notch on an arterial pressure trace mark?",
+    options: ["Opening of the mitral valve", "Opening of the aortic valve", "Closure of the aortic valve", "Peak of atrial contraction"], correctIndex: 2,
+    explanation: "When the aortic valve closes, the elastic recoil of the aorta causes a brief rebound in pressure. This appears as the dicrotic notch and marks the end of systole." },
+
+  { system: "nervous", difficulty: "easy",
+    question: "Which part of a neuron receives incoming signals from other neurons?",
+    options: ["Axon", "Dendrites", "Myelin sheath", "Axon terminal"], correctIndex: 1,
+    explanation: "Dendrites carry synaptic input toward the cell body, where the signals are integrated at the axon hillock." },
+  { system: "nervous", difficulty: "medium",
+    question: "Which neurotransmitter is the main inhibitory transmitter in the adult brain?",
+    options: ["Glutamate", "GABA", "Acetylcholine", "Dopamine"], correctIndex: 1,
+    explanation: "GABA opens Cl− channels (GABA-A receptors), hyperpolarising the postsynaptic cell. Glutamate is the main excitatory transmitter." },
+  { system: "nervous", difficulty: "hard",
+    question: "How does the Goldman–Hodgkin–Katz equation differ from the Nernst equation?",
+    options: ["It calculates the potential for a single ion only", "It combines several ions, weighted by their relative membrane permeabilities", "It ignores concentration gradients", "It only applies to muscle cells"], correctIndex: 1,
+    explanation: "Nernst gives the equilibrium potential of one ion. GHK predicts the membrane potential when several ions (mainly K+, Na+ and Cl−) cross at once, each weighted by its permeability." },
+
+  { system: "digestive", difficulty: "easy",
+    question: "Which organ stores and concentrates bile?",
+    options: ["Liver", "Gallbladder", "Pancreas", "Stomach"], correctIndex: 1,
+    explanation: "The gallbladder stores bile made by the liver and concentrates it by absorbing water until a fatty meal triggers its release." },
+  { system: "digestive", difficulty: "medium",
+    question: "Which brush-border enzyme splits lactose into glucose and galactose?",
+    options: ["Maltase", "Sucrase", "Lactase", "Amylase"], correctIndex: 2,
+    explanation: "Lactase on the small-intestine brush border digests lactose. Low lactase activity causes lactose intolerance." },
+  { system: "digestive", difficulty: "hard",
+    question: "Which hormone, released by duodenal S cells in response to acid, stimulates pancreatic ducts to secrete bicarbonate-rich fluid?",
+    options: ["Gastrin", "Secretin", "Motilin", "Somatostatin"], correctIndex: 1,
+    explanation: "Secretin neutralises the acidic chyme entering the duodenum by driving bicarbonate secretion from the pancreas and bile ducts." },
+
+  { system: "respiratory", difficulty: "easy",
+    question: "What is the main job of the epiglottis?",
+    options: ["Warming inhaled air", "Covering the larynx during swallowing", "Producing mucus", "Driving expiration"], correctIndex: 1,
+    explanation: "The epiglottis folds over the glottis when you swallow, which keeps food and liquid out of the airway." },
+  { system: "respiratory", difficulty: "medium",
+    question: "Which lung volume remains in the lungs after a maximal exhalation?",
+    options: ["Tidal volume", "Residual volume", "Vital capacity", "Inspiratory reserve volume"], correctIndex: 1,
+    explanation: "Residual volume (about 1.2 L) cannot be exhaled. It keeps the alveoli from collapsing and lets gas exchange continue between breaths." },
+  { system: "respiratory", difficulty: "hard",
+    question: "In the Haldane effect, what does deoxygenation of haemoglobin do?",
+    options: ["Decreases its capacity to carry CO2", "Increases its capacity to carry CO2", "Has no effect on CO2 transport", "Shifts the O2 dissociation curve to the left"], correctIndex: 1,
+    explanation: "Deoxyhaemoglobin binds H+ and forms carbamino compounds more readily, so blood unloading O2 in the tissues picks up more CO2." },
+
+  { system: "musculoskeletal", difficulty: "easy",
+    question: "Which type of joint is the hip?",
+    options: ["Hinge joint", "Ball-and-socket joint", "Pivot joint", "Saddle joint"], correctIndex: 1,
+    explanation: "The head of the femur sits in the acetabulum, a ball-and-socket joint that allows movement in all planes." },
+  { system: "musculoskeletal", difficulty: "medium",
+    question: "Which connective tissue structure attaches skeletal muscle to bone?",
+    options: ["Ligament", "Tendon", "Articular cartilage", "Periosteum"], correctIndex: 1,
+    explanation: "Tendons join muscle to bone. Ligaments connect bone to bone and stabilise joints." },
+  { system: "musculoskeletal", difficulty: "hard",
+    question: "In skeletal muscle excitation–contraction coupling, which T-tubule protein senses depolarisation and triggers the sarcoplasmic reticulum to release Ca2+?",
+    options: ["Ryanodine receptor", "Dihydropyridine receptor", "Nicotinic ACh receptor", "SERCA pump"], correctIndex: 1,
+    explanation: "The dihydropyridine receptor (an L-type Ca2+ channel acting as a voltage sensor) is mechanically coupled to the ryanodine receptor on the sarcoplasmic reticulum, which then releases Ca2+." }
 ];
 </script>
 
 <main class="game">
-  <div class="title">
-    <h1>BIOLOGY LOCKDOWN</h1>
-    <div class="tag">ESCAPE THE LAB</div>
-  </div>
+  <header class="top">
+    <h1>ESCAPE ROOM</h1>
+    <button type="button" id="muteBtn" class="pbtn small" aria-pressed="false" aria-label="Mute sound">SOUND ON</button>
+  </header>
 
-  <header class="hud">
+  <div class="hud">
     <div class="hud-cell">
       <span class="lbl">LIVES</span>
       <div id="hearts" role="img" aria-label="Lives: 3 of 3"></div>
@@ -447,11 +519,8 @@ const QUESTION_BANK = [
       <span class="lbl">TIME</span>
       <div id="timer" role="timer" aria-label="Time remaining">10:00</div>
     </div>
-    <div class="hud-buttons">
-      <button type="button" id="hintBtn" class="pbtn" aria-label="Use a hint">HINT <span class="pips" id="hintPips" aria-hidden="true"></span></button>
-      <button type="button" id="muteBtn" class="pbtn" aria-pressed="false" aria-label="Mute sound">SOUND ON</button>
-    </div>
-  </header>
+    <button type="button" id="hintBtn" class="pbtn" aria-label="Use a hint">HINT <span class="pips" id="hintPips" aria-hidden="true"></span></button>
+  </div>
 
   <figure class="scene-wrap" id="sceneWrap">
     <canvas id="scene" width="160" height="96" role="img" aria-label="A scientist in a lab coat stands in a sealed laboratory."></canvas>
@@ -463,12 +532,11 @@ const QUESTION_BANK = [
   <!-- Start -->
   <section class="panel" id="panelStart" aria-labelledby="startTitle">
     <h2 id="startTitle">THE LAB DOORS HAVE SEALED</h2>
-    <p class="intro">Only knowledge can set you free. Open five doors, one for each body system.</p>
+    <p class="intro">Only knowledge can set you free. Unlock five doors, one for each body system.</p>
     <ul class="rules">
-      <li>Answer 3 questions correctly to open each door.</li>
-      <li>A wrong answer costs a life and swaps in a new question.</li>
-      <li>3 hints per game. Each one removes two wrong answers.</li>
-      <li>The clock pauses while you read an explanation.</li>
+      <li>Answer 3 questions right to open each door.</li>
+      <li>A wrong answer costs a life and brings a new question.</li>
+      <li>3 hints remove two wrong answers each. The clock pauses while you read.</li>
     </ul>
     <fieldset class="diff">
       <legend>DIFFICULTY</legend>
@@ -503,7 +571,7 @@ const QUESTION_BANK = [
     </div>
     <div class="end-actions">
       <button type="button" id="againBtn" class="pbtn primary" aria-label="Play again on the same difficulty">PLAY AGAIN</button>
-      <button type="button" id="menuBtn" class="pbtn" aria-label="Back to the start screen">CHANGE DIFFICULTY</button>
+      <button type="button" id="menuBtn" class="pbtn" aria-label="Back to the start screen">MENU</button>
     </div>
   </section>
 </main>
@@ -556,6 +624,8 @@ const QUESTION_BANK = [
     current: null,           // { q, opts[] } currently on screen
     awaitingNext: false,     // an answer was given, waiting for Continue
     busy: false,             // door animation running
+    fbReady: false,          // explanation is on screen, Continue is available
+    seen: new Set(),         // questions shown so far this game
     muted: false
   };
 
@@ -577,13 +647,20 @@ const QUESTION_BANK = [
   const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const RANK_OF = { easy: 0, medium: 1, hard: 2 };
 
-  /* Each door gets its own shuffled queue: questions at the chosen difficulty first, with a
-     little randomness so neighbouring difficulties mix in and every game feels different.
-     Nothing repeats because each door walks down its own queue once. */
-  function buildQueues(diff) {
+  /* The questions shown in the previous game are remembered (also across page reloads when the
+     browser allows it) so the next game starts with a completely different set. */
+  const STORE_KEY = 'escapeRoomLastGame';
+  function loadLast() { try { return new Set(JSON.parse(localStorage.getItem(STORE_KEY) || '[]')); } catch (e) { return new Set(); } }
+  function saveLast(set) { try { localStorage.setItem(STORE_KEY, JSON.stringify([...set])); } catch (e) { /* storage is optional */ } }
+  let lastGameSeen = loadLast();
+
+  /* Each door gets its own shuffled queue. Questions from the previous game go to the back,
+     then the chosen difficulty comes first with some randomness so neighbouring difficulties
+     mix in. Nothing repeats inside a game because each door walks down its queue once. */
+  function buildQueues(diff, avoid) {
     return STAGES.map((st) =>
       QUESTION_BANK.filter((q) => q.system === st.id)
-        .map((q) => ({ q, k: Math.abs(RANK_OF[q.difficulty] - RANK_OF[diff]) + Math.random() * 1.6 }))
+        .map((q) => ({ q, k: (avoid.has(q.question) ? 100 : 0) + Math.abs(RANK_OF[q.difficulty] - RANK_OF[diff]) + Math.random() * 1.6 }))
         .sort((a, b) => a.k - b.k)
         .map((o) => o.q)
     );
@@ -618,7 +695,7 @@ const QUESTION_BANK = [
   };
 
   /* ============================== PIXEL ART ============================== */
-  const SPRITE = [
+  const SPRITE_IDLE = [
     '....KKKKKK....',
     '...KHHHHHHK...',
     '..KHHHHHHHHK..',
@@ -645,8 +722,34 @@ const QUESTION_BANK = [
     '..KBBK..KBBK..',
     '.KBBBK..KBBBK.'
   ];
+  /* Celebration pose: both arms raised above the head (rows 2-11), legs unchanged. */
+  const SPRITE_CHEER = [
+    '....KKKKKK....',
+    '...KHHHHHHK...',
+    'SSKHHHHHHHHKSS',
+    'SSKhHHHHHHhKSS',
+    'KWKHHSSSSHHKWK',
+    'KWKHSSSSSSHKWK',
+    'KWKHSESSESHKWK',
+    'KWKHSESSESHKWK',
+    'KWKHSSSSSSHKWK',
+    'KW.KHSMMSHK.WK',
+    'KW.KHSSSSHK.WK',
+    'KWW.KSSSSK.WWK',
+    '.KWWWTSSTWWWK.',
+    '..KWWTWWTWWK..',
+    '..KWWWTTWWWK..',
+    '..KWwWWTWwWK..',
+    '..KWwWWcWwWK..',
+    '..KWwWWWWwWK..',
+    '..KWWWWWWWWK..',
+    '..KWWWWWWWWK..',
+    ...SPRITE_IDLE.slice(20)
+  ];
+  /* Crying pose: wide open mouth (rows 9-10). Tears are drawn on top in drawChar. */
+  const SPRITE_CRY = SPRITE_IDLE.map((row, i) => (i === 9 || i === 10) ? '...KHSmmSHK...' : row);
   const PAL = {
-    K: '#1a1426', H: '#f5d76e', h: '#d4a437', S: '#f8d7bd', E: '#2f80ff', M: '#d9776e',
+    K: '#1a1426', H: '#f5d76e', h: '#d4a437', S: '#f8d7bd', E: '#2f80ff', M: '#d9776e', m: '#6b2233',
     W: '#f4f8fb', w: '#b4c3d3', T: '#3b4756', c: '#c9d3dc', P: '#35466b', B: '#1d1d2b'
   };
 
@@ -654,8 +757,10 @@ const QUESTION_BANK = [
   const g = els.scene.getContext('2d');
   const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
 
-  const scene = { charX: 22, charAlpha: 1, walking: false, doorOpen: 0, bolts: 0, fade: 0, flashA: 0, flashC: '#fff', dim: 0, confetti: null };
-  function resetScene() { Object.assign(scene, { charX: 22, charAlpha: 1, walking: false, doorOpen: 0, bolts: 0, fade: 0, flashA: 0, dim: 0, confetti: null }); }
+  const scene = { charX: 22, charAlpha: 1, walking: false, pose: 'idle', poseT0: 0, poseLoop: false, doorOpen: 0, bolts: 0, fade: 0, flashA: 0, flashC: '#fff', dim: 0, confetti: null };
+  function resetScene() { Object.assign(scene, { charX: 22, charAlpha: 1, walking: false, pose: 'idle', poseLoop: false, doorOpen: 0, bolts: 0, fade: 0, flashA: 0, dim: 0, confetti: null }); }
+  /* idle = standing and blinking, cheer = arms up and hopping, cry = tears and shaking */
+  function setPose(pose, loop = false) { scene.pose = pose; scene.poseT0 = performance.now() / 1000; scene.poseLoop = loop; }
   function flash(color) { scene.flashC = color; scene.flashA = 0.55; }
 
   function wave(id, i, t) {
@@ -718,20 +823,46 @@ const QUESTION_BANK = [
     }
     for (let i = 0; i < 3; i++) R(DX + 6 + i * 9, DY - 9, 6, 4, i < scene.bolts ? '#37f5b5' : '#3a1a22');
     if (o > 0) { g.globalAlpha = 0.22 * o; for (let yy = 64; yy < H; yy++) R(DX - (yy - 64) * 0.8, yy, DW + (yy - 64) * 1.6, 1, '#dffff4'); g.globalAlpha = 1; }
-    // character
-    const bob = scene.walking ? Math.floor(t * 8) % 2 : (reduceMotion ? 0 : Math.floor(t * 1.6) % 2);
-    const blink = (t % 3.4) > 3.25;
-    const cx = Math.round(scene.charX), cy = 42 - bob;
-    g.globalAlpha = scene.charAlpha;
-    R(cx + 2, 90, 24, 3, 'rgba(0,0,0,0.35)');
-    SPRITE.forEach((row, ry) => { for (let rx = 0; rx < 14; rx++) { let ch = row[rx]; if (ch === '.') continue; if (blink && ch === 'E') ch = 'S'; R(cx + rx * 2, cy + ry * 2, 2, 2, PAL[ch]); } });
-    g.globalAlpha = 1;
+    drawChar(t);
     // confetti
     if (scene.confetti) scene.confetti.forEach((p) => R(p.x, p.y, 2, 2, p.c));
     // overlays
     if (scene.dim > 0) { g.globalAlpha = scene.dim; R(0, 0, W, H, '#2a0610'); g.globalAlpha = 1; }
     if (scene.flashA > 0) { g.globalAlpha = Math.min(1, scene.flashA); R(0, 0, W, H, scene.flashC); g.globalAlpha = 1; }
     if (scene.fade > 0) { g.globalAlpha = scene.fade; R(0, 0, W, H, '#000'); g.globalAlpha = 1; }
+  }
+
+  function drawChar(t) {
+    const dt = t - scene.poseT0;
+    const cx = Math.round(scene.charX);
+    let sprite = SPRITE_IDLE, ox = 0, lift = 0, bob = 0;
+    if (scene.pose === 'cheer') {
+      sprite = SPRITE_CHEER;
+      if (!reduceMotion && (scene.poseLoop || dt < 0.9)) lift = Math.round(Math.abs(Math.sin(dt * Math.PI / 0.45)) * 9);   // two hops, then arms stay up
+    } else if (scene.pose === 'cry') {
+      sprite = SPRITE_CRY;
+      if (!reduceMotion) ox = Math.floor(t * 9) % 2;                                                                       // little sobbing shudder
+    } else {
+      bob = scene.walking ? Math.floor(t * 8) % 2 : (reduceMotion ? 0 : Math.floor(t * 1.6) % 2);
+    }
+    const cy = 42 - bob - lift;
+    const blink = scene.pose !== 'cheer' && (t % 3.4) > 3.25;
+    g.globalAlpha = scene.charAlpha;
+    R(cx + 2 + Math.round(lift / 3), 90, 24 - Math.round(lift / 1.5), 3, 'rgba(0,0,0,0.35)');
+    sprite.forEach((row, ry) => {
+      for (let rx = 0; rx < 14; rx++) {
+        let ch = row[rx]; if (ch === '.') continue;
+        if (blink && ch === 'E') ch = 'S';
+        R(cx + ox + rx * 2, cy + ry * 2, 2, 2, PAL[ch]);
+      }
+    });
+    if (scene.pose === 'cry') {                                   // two tear streams falling down the cheeks
+      [5, 8].forEach((col, n) => [0, 0.5].forEach((off) => {
+        const p = ((t * 2.2 + off + n * 0.25) % 1);
+        R(cx + ox + col * 2, cy + (8 + Math.floor(p * 4)) * 2, 2, 2, '#8fd8ff');
+      }));
+    }
+    g.globalAlpha = 1;
   }
 
   let lastFrame = performance.now();
@@ -835,7 +966,7 @@ const QUESTION_BANK = [
       lives: START_LIVES, hints: START_HINTS, hintUsed: false,
       timeLimit: DIFFICULTIES[diff].seconds, timeLeft: DIFFICULTIES[diff].seconds,
       score: 0, answered: 0, correct: 0, wrong: 0, current: null,
-      awaitingNext: false, busy: false, queues: buildQueues(diff)
+      awaitingNext: false, busy: false, fbReady: false, seen: new Set(), queues: buildQueues(diff, lastGameSeen)
     });
     resetScene();
     showPanel('quiz');
@@ -850,7 +981,9 @@ const QUESTION_BANK = [
     if (!q) q = queue[Math.floor(Math.random() * queue.length)];   // safety net if a door runs out
     const opts = shuffle(q.options.map((text, i) => ({ text, correct: i === q.correctIndex, elim: false })));
     game.current = { q, opts };
-    game.awaitingNext = false; game.hintUsed = false;
+    game.awaitingNext = false; game.hintUsed = false; game.fbReady = false;
+    game.seen.add(q.question); lastGameSeen = new Set(game.seen); saveLast(lastGameSeen);
+    setPose('idle');
     els.qRoom.textContent = STAGES[game.stage].name.toUpperCase();
     els.qCount.textContent = `LOCK ${game.qIndex + 1} OF ${LOCKS_PER_DOOR}`;
     els.qText.textContent = q.question;
@@ -863,7 +996,7 @@ const QUESTION_BANK = [
       b.addEventListener('click', () => answer(i));
       return b;
     }));
-    els.feedback.hidden = true;
+    els.feedback.hidden = true; els.opts.hidden = false;
     els.panelQuiz.classList.remove('shake');
     updateHud();
     els.qText.focus({ preventScroll: true });
@@ -884,12 +1017,12 @@ const QUESTION_BANK = [
       game.score += 100 + Math.round(50 * game.timeLeft / game.timeLimit);
       scene.bolts = game.qIndex;
       btns[i].classList.add('correct');
-      flash('#58ff8a'); sfx.correct();
+      flash('#58ff8a'); sfx.correct(); setPose('cheer');
       head = game.qIndex >= LOCKS_PER_DOOR ? 'CORRECT! FINAL LOCK RELEASED' : `CORRECT! LOCK ${game.qIndex} OF ${LOCKS_PER_DOOR} OPEN`;
     } else {
       game.wrong++; game.lives--;
       btns[i].classList.add('wrong'); btns[rightIdx].classList.add('correct');
-      flash('#ff4d6d'); sfx.wrong();
+      flash('#ff4d6d'); sfx.wrong(); setPose('cry');
       void els.panelQuiz.offsetWidth; els.panelQuiz.classList.add('shake');
       renderHearts(game.lives);
       head = game.lives > 0 ? 'WRONG! YOU LOST A LIFE' : 'WRONG! NO LIVES LEFT';
@@ -899,10 +1032,16 @@ const QUESTION_BANK = [
     els.fbText.textContent = (o.correct ? '' : `Correct answer: ${game.current.opts[rightIdx].text}. `) + game.current.q.explanation;
     els.nextBtn.textContent = game.lives <= 0 ? 'SEE RESULT >' : (game.qIndex >= LOCKS_PER_DOOR ? 'OPEN THE DOOR >' : 'CONTINUE >');
     els.nextBtn.disabled = false;
-    els.feedback.hidden = false;
     updateHud(); updateTracker();
+    clearTimeout(fbTimer);
+    fbTimer = setTimeout(showFeedback, 700);     // let the green / red highlight and the character react first
+  }
+
+  let fbTimer = 0;
+  function showFeedback() {
+    if (game.phase !== 'play' || !game.awaitingNext) return;
+    els.opts.hidden = true; els.feedback.hidden = false; game.fbReady = true;
     els.nextBtn.focus({ preventScroll: true });
-    els.feedback.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
   function useHint() {
@@ -919,14 +1058,14 @@ const QUESTION_BANK = [
   }
 
   async function onNext() {
-    if (game.phase !== 'play' || !game.awaitingNext || game.busy) return;
+    if (game.phase !== 'play' || !game.awaitingNext || !game.fbReady || game.busy) return;
     if (game.lives <= 0) { endGame(false, 'lives'); return; }
     if (game.qIndex >= LOCKS_PER_DOOR) { await unlockDoor(); return; }
     showQuestion();
   }
 
   async function unlockDoor() {
-    game.busy = true; els.nextBtn.disabled = true; updateHud();
+    game.busy = true; els.nextBtn.disabled = true; setPose('idle'); updateHud();
     els.fbHead.textContent = 'THE LOCKS CLICK OPEN...';
     sfx.unlock();
     await sleep(450);
@@ -956,7 +1095,7 @@ const QUESTION_BANK = [
   }
 
   function endGame(win, reason) {
-    game.phase = 'end'; game.busy = false; game.awaitingNext = false;
+    game.phase = 'end'; game.busy = false; game.awaitingNext = false; game.fbReady = false; clearTimeout(fbTimer);
     showPanel('end');
     const used = Math.round(game.timeLimit - game.timeLeft);
     const acc = game.answered ? Math.round(100 * game.correct / game.answered) : 0;
@@ -967,21 +1106,20 @@ const QUESTION_BANK = [
     let html = stat('TIME TAKEN', fmtTime(used)) + stat('LIVES LEFT', hearts) + stat('HINTS USED', String(hintsUsed)) + stat('ACCURACY', acc + '%') + stat('SCORE', String(game.score));
     if (win) {
       els.endTitle.textContent = 'ESCAPED!';
-      els.endMsg.textContent = `All five doors are open. You walked out of the lab on ${DIFFICULTIES[game.difficulty].label} difficulty.`;
+      els.endMsg.textContent = `All five doors are open. You escaped on ${DIFFICULTIES[game.difficulty].label}.`;
       const rk = RANKS.find((r) => rating >= r.min);
       els.rankName.textContent = rk.name; els.rankText.textContent = rk.text; els.rankBox.hidden = false;
-      setCaption('FREEDOM! ALL DOORS OPEN'); sfx.win();
+      setCaption('FREEDOM! ALL DOORS OPEN'); sfx.win(); setPose('cheer', true);
     } else {
       els.endTitle.textContent = reason === 'time' ? 'TIME’S UP' : 'GAME OVER';
-      els.endMsg.textContent = (reason === 'time' ? 'The clock ran out.' : 'You ran out of lives.') + ' The lab stays sealed. Try again with fresh questions.';
+      els.endMsg.textContent = (reason === 'time' ? 'The clock ran out.' : 'You ran out of lives.') + ' The lab stays sealed. Try again with new questions.';
       html += stat('DOORS OPENED', `${game.doorsOpen} / ${STAGES.length}`);
       els.rankBox.hidden = true;
-      scene.dim = 0.45; setCaption('LOCKED IN'); sfx.lose();
+      scene.dim = 0.45; setCaption('LOCKED IN'); sfx.lose(); setPose('cry');
     }
     els.stats.innerHTML = html;
     updateHud(); updateTracker();
     els.againBtn.focus({ preventScroll: true });
-    els.panelEnd.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
   function toMenu() {
@@ -1009,7 +1147,7 @@ const QUESTION_BANK = [
     if (e.ctrlKey || e.metaKey || e.altKey || game.phase !== 'play') return;
     if (e.key >= '1' && e.key <= '4') { e.preventDefault(); answer(Number(e.key) - 1); }
     else if (e.key === 'h' || e.key === 'H') { useHint(); }
-    else if ((e.key === 'Enter' || e.key === ' ') && game.awaitingNext && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); onNext(); }
+    else if ((e.key === 'Enter' || e.key === ' ') && game.awaitingNext && game.fbReady && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); onNext(); }
   });
 
   /* Countdown. It only runs while a question is waiting for an answer. */

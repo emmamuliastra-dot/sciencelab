@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Biology Lockdown</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<style>
+/* Layout: one centred column. Title, sticky HUD, pixel-art lab scene, door tracker, then the active panel (start / quiz / end). */
+:root {
+  --bg: #070c0f;
+  --panel: #0e171b;
+  --panel-2: #15232a;
+  --edge: #2b4650;
+  --ink: #e4fff7;
+  --dim: #8fb0ad;
+  --neon: #37f5b5;
+  --neon-deep: #0f6b52;
+  --good: #58ff8a;
+  --bad: #ff4d6d;
+  --warn: #ffd166;
+  --px: 'Press Start 2P', 'Courier New', monospace;
+  --body: 'VT323', 'Courier New', monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 22px/1.25 var(--body);
+  padding-block: 16px 48px;
+  padding-inline: 16px;
+}
+/* CRT scanlines */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .16) 2px 3px);
+}
+.game { max-width: 880px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Title */
+.title { display: flex; flex-direction: column; gap: 8px; }
+h1 {
+  margin: 0;
+  font: 400 clamp(16px, 4.4vw, 30px)/1.3 var(--px);
+  letter-spacing: .04em;
+  text-wrap: balance;
+  text-shadow: 0 0 14px rgba(55, 245, 181, .55), 3px 3px 0 var(--neon-deep);
+}
+.tag { font: 400 10px/1.6 var(--px); color: var(--neon); letter-spacing: .14em; }
+
+/* Pixel buttons */
+.pbtn {
+  font: 400 11px/1 var(--px);
+  letter-spacing: .06em;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 0;
+  min-height: 44px;
+  padding: 12px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 0 0 3px var(--edge), inset -4px -4px 0 rgba(0, 0, 0, .35), inset 4px 4px 0 rgba(255, 255, 255, .08);
+}
+.pbtn:hover:not(:disabled) { background: #1d333c; }
+.pbtn:active:not(:disabled) { transform: translateY(2px); }
+.pbtn:disabled { opacity: .4; cursor: not-allowed; }
+.pbtn:focus-visible, .diff-opt input:focus-visible + span { outline: 3px dashed var(--neon); outline-offset: 4px; }
+.pbtn.primary { background: var(--neon); color: #03140e; box-shadow: 0 0 0 3px var(--neon-deep), inset -4px -4px 0 rgba(0, 0, 0, .25), inset 4px 4px 0 rgba(255, 255, 255, .35), 0 0 22px rgba(55, 245, 181, .35); }
+.pbtn.primary:hover:not(:disabled) { background: #6dffc9; }
+
+/* HUD */
+.hud {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 10px 12px;
+  background: var(--panel);
+  box-shadow: 0 0 0 3px var(--edge), 0 6px 0 3px var(--bg);
+}
+.hud-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lbl { font: 400 8px/1 var(--px); color: var(--dim); letter-spacing: .14em; }
+#hearts { display: flex; gap: 6px; }
+.heart { width: 28px; height: 24px; display: block; }
+.heart.full rect { fill: var(--bad); }
+.heart.full rect.hl { fill: #fff; opacity: .65; }
+.heart.empty rect { fill: #2a2030; }
+.heart.lost { animation: heartLoss .8s steps(2, end); }
+@keyframes heartLoss { 0% { transform: scale(1.5); filter: brightness(2); } 50% { transform: scale(1.2); filter: brightness(1); } 100% { transform: scale(1); } }
+#timer { font: 400 22px/1 var(--px); font-variant-numeric: tabular-nums; color: var(--neon); text-shadow: 0 0 10px rgba(55, 245, 181, .5); }
+#timer.warn { color: var(--warn); text-shadow: 0 0 10px rgba(255, 209, 102, .5); }
+#timer.crit { color: var(--bad); animation: blink 1s steps(2, end) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.hud-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+.pips { display: inline-flex; gap: 3px; }
+.pip { width: 8px; height: 8px; background: var(--warn); }
+.pip.off { background: #3a3320; }
+
+/* Scene */
+.scene-wrap { margin: 0; position: relative; box-shadow: 0 0 0 4px var(--edge), 0 0 0 8px var(--bg), 0 0 32px rgba(55, 245, 181, .18); background: #000; }
+#scene { display: block; width: 100%; height: auto; aspect-ratio: 160 / 96; image-rendering: pixelated; }
+.caption {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 7px 9px;
+  font: 400 9px/1.4 var(--px);
+  letter-spacing: .1em;
+  color: var(--neon);
+  background: rgba(7, 12, 15, .85);
+  box-shadow: 0 0 0 2px var(--neon-deep);
+}
+.caption.pulse { animation: capPulse 1.4s steps(4, end); }
+@keyframes capPulse { 0%, 50% { background: var(--neon); color: #03140e; } 100% { } }
+
+/* Door tracker */
+.tracker { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.tracker li { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; background: var(--panel); box-shadow: 0 0 0 2px var(--edge); min-width: 0; }
+.tracker canvas { width: 36px; height: 48px; image-rendering: pixelated; }
+.tracker .name { font: 400 clamp(14px, 3.7vw, 18px)/1 var(--body); color: var(--dim); text-align: center; }
+.tracker .dots { display: flex; gap: 3px; }
+.tracker .dot { width: 7px; height: 7px; background: #1f3037; }
+.tracker .dot.on { background: var(--neon); }
+.tracker li.is-current { box-shadow: 0 0 0 2px var(--neon), 0 0 18px rgba(55, 245, 181, .4); }
+.tracker li.is-current .name { color: var(--ink); }
+.tracker li.is-open .name { color: var(--neon); }
+@media (min-width: 560px) { .tracker canvas { width: 48px; height: 64px; } .tracker .name { font-size: 22px; } }
+
+/* Panels */
+.panel { background: var(--panel); padding: 20px 18px; box-shadow: 0 0 0 3px var(--edge); display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel h2 { margin: 0; font: 400 clamp(13px, 3.2vw, 18px)/1.5 var(--px); letter-spacing: .04em; text-wrap: balance; }
+.intro { font-size: 28px; line-height: 1.15; margin: 0; max-width: 34ch; text-shadow: 0 0 10px rgba(55, 245, 181, .25); }
+.rules { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--dim); font-size: 22px; }
+.rules li { padding-left: 22px; position: relative; }
+.rules li::before { content: ""; position: absolute; left: 0; top: .42em; width: 10px; height: 10px; background: var(--neon); }
+fieldset.diff { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 12px; }
+fieldset.diff legend { font: 400 9px/1 var(--px); color: var(--dim); letter-spacing: .14em; padding: 0; margin-bottom: 12px; }
+.diff-opt { flex: 1 1 140px; position: relative; cursor: pointer; }
+.diff-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.diff-opt span { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 14px 8px; font: 400 12px/1 var(--px); background: var(--panel-2); box-shadow: 0 0 0 3px var(--edge); }
+.diff-opt small { font: 400 20px/1 var(--body); color: var(--dim); font-variant-numeric: tabular-nums; }
+.diff-opt input:checked + span { background: #0f3d34; box-shadow: 0 0 0 3px var(--neon), 0 0 18px rgba(55, 245, 181, .35); color: var(--neon); }
+.diff-opt input:checked + span small { color: var(--ink); }
+.start-actions { display: flex; }
+.start-actions .pbtn { width: 100%; font-size: 13px; padding-block: 18px; }
+
+/* Quiz */
+.q-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; font: 400 9px/1.5 var(--px); letter-spacing: .1em; color: var(--neon); }
+#qText { font: 400 30px/1.1 var(--body); letter-spacing: 0; margin: 0; text-wrap: pretty; outline: none; }
+@media (max-width: 560px) { #qText { font-size: 27px; } }
+.opts { display: grid; gap: 14px; grid-template-columns: 1fr; padding: 3px; }
+@media (min-width: 720px) { .opts { grid-template-columns: 1fr 1fr; } }
+.opt {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  min-height: 62px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 0;
+  cursor: pointer;
+  min-width: 0;
+  box-shadow: 0 0 0 3px var(--edge), inset -4px -4px 0 rgba(0, 0, 0, .35), inset 4px 4px 0 rgba(255, 255, 255, .07);
+}
+.opt .txt { min-width: 0; overflow-wrap: anywhere; }
+.opt .key { flex: none; width: 32px; height: 32px; display: grid; place-items: center; font: 400 12px/1 var(--px); color: #03140e; background: var(--neon); }
+.opt:hover:not(:disabled) { background: #1d333c; }
+.opt:focus-visible { outline: 3px dashed var(--neon); outline-offset: 4px; }
+.opt:disabled { cursor: default; }
+.opt.elim { opacity: .35; text-decoration: line-through; }
+.opt.elim .key { background: var(--dim); }
+.opt.correct { background: #0e3a26; color: #eafff0; box-shadow: 0 0 0 3px var(--good), 0 0 22px rgba(88, 255, 138, .5); animation: goodPulse .5s steps(4, end); }
+.opt.correct .key { background: var(--good); }
+.opt.wrong { background: #471828; color: #ffe6ec; box-shadow: 0 0 0 3px var(--bad), 0 0 22px rgba(255, 77, 109, .45); }
+.opt.wrong .key { background: var(--bad); color: #1a0309; }
+@keyframes goodPulse { 0% { transform: scale(1.03); filter: brightness(1.8); } 100% { transform: scale(1); filter: none; } }
+.shake { animation: shake .45s steps(8, end); }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 15% { transform: translateX(-8px); } 30% { transform: translateX(8px); } 45% { transform: translateX(-6px); } 60% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+
+.feedback { padding: 14px 16px; background: var(--panel-2); border-left: 8px solid var(--neon); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.feedback.good { border-color: var(--good); }
+.feedback.bad { border-color: var(--bad); }
+.fb-head { font: 400 12px/1.4 var(--px); letter-spacing: .06em; }
+.feedback.good .fb-head { color: var(--good); }
+.feedback.bad .fb-head { color: var(--bad); }
+.feedback p { margin: 0; font-size: 24px; line-height: 1.15; }
+
+/* End panel */
+.stats { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.stat { background: var(--panel-2); padding: 12px; box-shadow: 0 0 0 2px var(--edge); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.stat dt { font: 400 8px/1.4 var(--px); color: var(--dim); letter-spacing: .12em; }
+.stat dd { margin: 0; font: 400 28px/1 var(--body); font-variant-numeric: tabular-nums; }
+.stat dd .heart { width: 22px; height: 19px; display: inline-block; margin-right: 3px; }
+.rank { text-align: center; padding: 16px 12px; background: #0f3d34; box-shadow: 0 0 0 3px var(--neon), 0 0 24px rgba(55, 245, 181, .35); display: flex; flex-direction: column; gap: 8px; }
+.rank .lbl { color: var(--neon); }
+.rank .rank-name { font: 400 clamp(14px, 4vw, 22px)/1.4 var(--px); color: var(--ink); text-wrap: balance; }
+.rank p { margin: 0; color: var(--dim); font-size: 22px; }
+.end-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+.end-actions .pbtn { flex: 1 1 200px; }
+.end-msg { margin: 0; font-size: 26px; line-height: 1.15; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+
+<!-- =====================================================================
+     QUESTION BANK  (edit me!)
+     Each entry: system, difficulty, question, options (4), correctIndex, explanation
+       system     : circulatory | nervous | digestive | respiratory | musculoskeletal
+       difficulty : easy | medium | hard
+       correctIndex is the 0-based position of the right answer in "options".
+       Answers are shuffled on screen automatically. Keep at least 5 questions
+       per system so a wrong answer can always be replaced by a fresh one.
+     ===================================================================== -->
+<script>
+const QUESTION_BANK = [
+
+  /* ------------------------------ CIRCULATORY ------------------------------ */
+  { system: "circulatory", difficulty: "easy",
+    question: "Which chamber of the heart ejects oxygenated blood into the aorta?",
+    options: ["Right atrium", "Right ventricle", "Left atrium", "Left ventricle"], correctIndex: 3,
+    explanation: "The left ventricle has the thickest myocardial wall because it must generate enough pressure to drive blood around the whole systemic circulation." },
+  { system: "circulatory", difficulty: "easy",
+    question: "Which vessels carry blood away from the heart?",
+    options: ["Veins", "Arteries", "Venules", "Lymphatic ducts"], correctIndex: 1,
+    explanation: "Arteries are defined by direction of flow, not oxygen content. The pulmonary arteries carry deoxygenated blood away from the heart, while the pulmonary veins return oxygenated blood to it." },
+  { system: "circulatory", difficulty: "easy",
+    question: "Which valve lies between the left atrium and the left ventricle?",
+    options: ["Tricuspid valve", "Pulmonary valve", "Mitral (bicuspid) valve", "Aortic valve"], correctIndex: 2,
+    explanation: "The mitral valve stops blood flowing back into the left atrium during ventricular systole. The tricuspid valve does the same job on the right side." },
+  { system: "circulatory", difficulty: "medium",
+    question: "Why does the sinoatrial (SA) node set the heart rate under normal conditions?",
+    options: ["It is the only cardiac tissue able to fire action potentials", "It has the fastest rate of spontaneous diastolic depolarisation", "It is the only part of the heart with autonomic innervation", "It sits within the ventricular septum"], correctIndex: 1,
+    explanation: "SA nodal cells depolarise spontaneously (the pacemaker potential) faster than any other cardiac tissue, so they reach threshold first and suppress the slower latent pacemakers." },
+  { system: "circulatory", difficulty: "medium",
+    question: "Which current is mainly responsible for the plateau (phase 2) of a ventricular myocyte action potential?",
+    options: ["Fast Na+ influx", "Ca2+ influx through L-type channels", "Cl− influx", "K+ efflux alone"], correctIndex: 1,
+    explanation: "Inward Ca2+ current through L-type channels balances outward K+ current and holds the membrane near 0 mV. The long plateau lengthens the refractory period and triggers Ca2+-induced Ca2+ release." },
+  { system: "circulatory", difficulty: "medium",
+    question: "A resting person has a cardiac output of 5.0 L/min and a heart rate of 70 beats/min. What is the approximate stroke volume?",
+    options: ["36 mL", "71 mL", "140 mL", "350 mL"], correctIndex: 1,
+    explanation: "Stroke volume = cardiac output ÷ heart rate = 5000 mL ÷ 70 ≈ 71 mL per beat." },
+  { system: "circulatory", difficulty: "hard",
+    question: "According to the Frank–Starling mechanism, what happens when end-diastolic volume increases within the physiological range?",
+    options: ["Stroke volume falls because the ventricle is overfilled", "Stroke volume rises because stretch optimises sarcomere length and increases myofilament Ca2+ sensitivity", "Stroke volume is unchanged because contractility is independent of preload", "Heart rate falls through the baroreceptor reflex alone"], correctIndex: 1,
+    explanation: "Greater diastolic stretch moves sarcomeres toward optimal length and raises troponin C Ca2+ sensitivity, so the ventricle ejects a bigger stroke volume. This matches output to venous return beat by beat." },
+  { system: "circulatory", difficulty: "hard",
+    question: "During which phase of the cardiac cycle are all four valves closed while ventricular pressure is rising?",
+    options: ["Rapid ventricular filling", "Rapid ventricular ejection", "Atrial systole", "Isovolumetric contraction"], correctIndex: 3,
+    explanation: "In isovolumetric contraction the AV valves have closed but ventricular pressure is still below aortic pressure, so the aortic valve stays shut and volume cannot change." },
+  { system: "circulatory", difficulty: "hard",
+    question: "If a vessel’s radius is halved and everything else stays constant, by what factor does its resistance to flow change (Poiseuille’s law)?",
+    options: ["It doubles", "It quadruples", "It increases 8-fold", "It increases 16-fold"], correctIndex: 3,
+    explanation: "Resistance is proportional to 1/r⁴, so halving the radius gives (1/0.5)⁴ = 16 times the resistance. Small changes in arteriolar radius therefore control blood flow very powerfully." },
+
+  /* -------------------------------- NERVOUS -------------------------------- */
+  { system: "nervous", difficulty: "easy",
+    question: "Which cell type forms myelin around axons in the central nervous system?",
+    options: ["Schwann cells", "Astrocytes", "Oligodendrocytes", "Microglia"], correctIndex: 2,
+    explanation: "Oligodendrocytes wrap CNS axons, and one cell can myelinate several axons. Schwann cells myelinate peripheral axons, one segment per cell." },
+  { system: "nervous", difficulty: "easy",
+    question: "Which brain structure is most important for coordinating balance and fine motor movement?",
+    options: ["Thalamus", "Cerebellum", "Hippocampus", "Medulla oblongata"], correctIndex: 1,
+    explanation: "The cerebellum compares intended movement with actual movement and corrects the difference, refining coordination, posture and balance." },
+  { system: "nervous", difficulty: "easy",
+    question: "What is the approximate resting membrane potential of a typical neuron?",
+    options: ["+30 mV", "0 mV", "−70 mV", "−120 mV"], correctIndex: 2,
+    explanation: "At rest the membrane is far more permeable to K+ than to Na+, and the Na+/K+-ATPase adds a small hyperpolarising contribution, giving about −70 mV." },
+  { system: "nervous", difficulty: "medium",
+    question: "Which event produces the rapid upstroke of a neuronal action potential?",
+    options: ["Opening of voltage-gated K+ channels", "Opening of voltage-gated Na+ channels", "Activation of the Na+/K+-ATPase", "Opening of ligand-gated Cl− channels"], correctIndex: 1,
+    explanation: "Depolarisation to threshold opens voltage-gated Na+ channels. The resulting regenerative Na+ influx drives the membrane toward the Na+ equilibrium potential." },
+  { system: "nervous", difficulty: "medium",
+    question: "Saltatory conduction speeds up action potentials in myelinated axons because the impulse is regenerated at which structures?",
+    options: ["Dendritic spines", "Synaptic boutons", "Nodes of Ranvier", "Myelin internodes"], correctIndex: 2,
+    explanation: "Myelin insulates the internodes, so current spreads passively and quickly to the next node of Ranvier. Voltage-gated Na+ channels are concentrated there and renew the signal." },
+  { system: "nervous", difficulty: "medium",
+    question: "Which neurotransmitter do preganglionic neurons release in both the sympathetic and parasympathetic divisions?",
+    options: ["Noradrenaline", "Acetylcholine", "Dopamine", "Serotonin"], correctIndex: 1,
+    explanation: "All preganglionic autonomic neurons are cholinergic and act on nicotinic receptors in the ganglia. Postganglionic neurons release ACh (parasympathetic) or mostly noradrenaline (sympathetic)." },
+  { system: "nervous", difficulty: "hard",
+    question: "Non-depolarising neuromuscular blockers such as tubocurarine cause paralysis by which mechanism?",
+    options: ["Inhibiting acetylcholinesterase", "Blocking presynaptic voltage-gated Ca2+ channels", "Preventing Ca2+ release from the sarcoplasmic reticulum", "Competitively blocking nicotinic ACh receptors at the motor end plate"], correctIndex: 3,
+    explanation: "They compete with ACh for nicotinic receptors, so end-plate potentials fail to reach threshold. Acetylcholinesterase inhibitors such as neostigmine can overcome the block by raising ACh levels." },
+  { system: "nervous", difficulty: "hard",
+    question: "Which receptor acts as a coincidence detector in hippocampal long-term potentiation by requiring both glutamate binding and postsynaptic depolarisation?",
+    options: ["GABA-A receptor", "Nicotinic ACh receptor", "Glycine receptor", "NMDA receptor"], correctIndex: 3,
+    explanation: "At resting potential the NMDA receptor channel is blocked by Mg2+. Glutamate binding plus depolarisation expels the Mg2+, allowing Ca2+ entry that triggers LTP." },
+  { system: "nervous", difficulty: "hard",
+    question: "In a neuron, what does raising the extracellular K+ concentration (hyperkalaemia) do to the resting membrane potential?",
+    options: ["It becomes more negative", "It becomes less negative (depolarises)", "It is unchanged because Na+ sets it", "It reverses to a positive value"], correctIndex: 1,
+    explanation: "A smaller K+ gradient shifts the K+ equilibrium potential upward, so the resting potential depolarises. Sustained depolarisation can inactivate Na+ channels and reduce excitability." },
+
+  /* ------------------------------- DIGESTIVE ------------------------------- */
+  { system: "digestive", difficulty: "easy",
+    question: "Where does most nutrient absorption take place?",
+    options: ["Stomach", "Small intestine", "Large intestine", "Oesophagus"], correctIndex: 1,
+    explanation: "Folds, villi and microvilli give the small intestine an enormous absorptive surface area, so most nutrients are absorbed there." },
+  { system: "digestive", difficulty: "easy",
+    question: "Which organ synthesises bile?",
+    options: ["Gallbladder", "Pancreas", "Liver", "Duodenum"], correctIndex: 2,
+    explanation: "Hepatocytes make bile. The gallbladder only stores and concentrates it until a fatty meal triggers its release." },
+  { system: "digestive", difficulty: "easy",
+    question: "Which enzyme in saliva begins the digestion of starch?",
+    options: ["Pepsin", "Salivary amylase", "Lipase", "Trypsin"], correctIndex: 1,
+    explanation: "Salivary α-amylase breaks starch into shorter oligosaccharides in the mouth before stomach acid inactivates it." },
+  { system: "digestive", difficulty: "medium",
+    question: "Which pair of products is secreted by gastric parietal cells?",
+    options: ["Pepsinogen and mucus", "Gastrin and somatostatin", "Hydrochloric acid and intrinsic factor", "Bicarbonate and secretin"], correctIndex: 2,
+    explanation: "Parietal cells secrete HCl (via the H+/K+-ATPase) and intrinsic factor. Chief cells release pepsinogen and G cells release gastrin." },
+  { system: "digestive", difficulty: "medium",
+    question: "Which hormone, released by duodenal I cells in response to fat and protein, contracts the gallbladder and stimulates pancreatic enzyme secretion?",
+    options: ["Gastrin", "Secretin", "Cholecystokinin (CCK)", "Ghrelin"], correctIndex: 2,
+    explanation: "CCK contracts the gallbladder, relaxes the sphincter of Oddi and stimulates pancreatic acinar cells. Secretin mainly stimulates bicarbonate secretion." },
+  { system: "digestive", difficulty: "medium",
+    question: "What activates pancreatic trypsinogen to trypsin in the small intestine?",
+    options: ["Hydrochloric acid", "Bile salts", "Enteropeptidase on the duodenal brush border", "Pepsin"], correctIndex: 2,
+    explanation: "Enteropeptidase cleaves trypsinogen, and active trypsin then activates the other pancreatic zymogens. This keeps the proteases inactive until they reach the gut lumen." },
+  { system: "digestive", difficulty: "hard",
+    question: "Which transporter moves glucose into the enterocyte across the apical membrane against its concentration gradient?",
+    options: ["GLUT2", "GLUT5", "SGLT1", "GLUT4"], correctIndex: 2,
+    explanation: "SGLT1 couples glucose uptake to Na+ moving down its gradient (secondary active transport). Glucose then leaves across the basolateral membrane through GLUT2." },
+  { system: "digestive", difficulty: "hard",
+    question: "Where is the vitamin B12–intrinsic factor complex absorbed?",
+    options: ["Duodenum", "Jejunum", "Terminal ileum", "Ascending colon"], correctIndex: 2,
+    explanation: "Specific receptors on terminal ileal enterocytes take up the complex. Ileal resection or loss of intrinsic factor (pernicious anaemia) can therefore cause B12 deficiency." },
+  { system: "digestive", difficulty: "hard",
+    question: "Which gastric cells release the histamine that stimulates parietal cells to secrete acid?",
+    options: ["G cells", "Enterochromaffin-like (ECL) cells", "D cells", "Chief cells"], correctIndex: 1,
+    explanation: "ECL cells release histamine, which acts on parietal-cell H2 receptors. G cells release gastrin, which stimulates ECL cells, while D cells release inhibitory somatostatin." },
+
+  /* ------------------------------ RESPIRATORY ------------------------------ */
+  { system: "respiratory", difficulty: "easy",
+    question: "Which muscle does most of the work during quiet inspiration?",
+    options: ["Diaphragm", "Internal intercostals", "Rectus abdominis", "Pectoralis minor"], correctIndex: 0,
+    explanation: "Contraction flattens the diaphragm, enlarging the thoracic cavity and lowering intrapleural pressure so air flows in. Quiet expiration is passive." },
+  { system: "respiratory", difficulty: "easy",
+    question: "Where does gas exchange between air and blood occur?",
+    options: ["Bronchi", "Trachea", "Alveoli", "Terminal bronchioles"], correctIndex: 2,
+    explanation: "Alveolar walls are extremely thin and surrounded by capillaries, giving a short diffusion distance and a huge surface area." },
+  { system: "respiratory", difficulty: "easy",
+    question: "Approximately what percentage of dry atmospheric air is oxygen?",
+    options: ["0.04%", "21%", "50%", "78%"], correctIndex: 1,
+    explanation: "Dry air is about 21% O2 and 78% N2, with only around 0.04% CO2." },
+  { system: "respiratory", difficulty: "medium",
+    question: "In what form is most CO2 carried in the blood?",
+    options: ["Dissolved CO2", "Carbaminohaemoglobin", "Bicarbonate (HCO3−)", "Carbonic acid"], correctIndex: 2,
+    explanation: "About 70% travels as bicarbonate, formed in red cells by carbonic anhydrase and exchanged for Cl− (the chloride shift). Roughly 20% is carbamino compounds and 10% is dissolved." },
+  { system: "respiratory", difficulty: "medium",
+    question: "Which change shifts the oxyhaemoglobin dissociation curve to the right (lower O2 affinity)?",
+    options: ["Decreased temperature", "Increased 2,3-BPG", "Decreased PCO2", "Increased pH"], correctIndex: 1,
+    explanation: "Higher 2,3-BPG, H+, CO2 and temperature all lower haemoglobin’s affinity so more O2 is unloaded in active tissue (the Bohr effect). The other options shift the curve left." },
+  { system: "respiratory", difficulty: "medium",
+    question: "Which cells secrete pulmonary surfactant?",
+    options: ["Type I pneumocytes", "Type II pneumocytes", "Alveolar macrophages", "Goblet cells"], correctIndex: 1,
+    explanation: "Type II pneumocytes secrete surfactant, which lowers alveolar surface tension and prevents collapse at low volumes. Premature infants may lack it, causing respiratory distress syndrome." },
+  { system: "respiratory", difficulty: "hard",
+    question: "Using PAO2 = FiO2 × (Patm − PH2O) − PaCO2/R, what is PAO2 breathing room air at sea level with Patm = 760 mmHg, PH2O = 47 mmHg, PaCO2 = 40 mmHg and R = 0.8?",
+    options: ["≈ 40 mmHg", "≈ 60 mmHg", "≈ 100 mmHg", "≈ 150 mmHg"], correctIndex: 2,
+    explanation: "0.21 × (760 − 47) ≈ 150 mmHg, minus 40 ÷ 0.8 = 50 mmHg, gives about 100 mmHg. Arterial PO2 is slightly lower because of physiological shunt and V/Q mismatch." },
+  { system: "respiratory", difficulty: "hard",
+    question: "Central chemoreceptors in the medulla respond most directly to a change in which variable?",
+    options: ["Arterial PO2", "Cerebrospinal fluid H+ concentration", "Blood glucose", "Arterial blood pressure"], correctIndex: 1,
+    explanation: "CO2 crosses the blood–brain barrier and forms H+ in the CSF, which stimulates the central chemoreceptors. The peripheral chemoreceptors (carotid bodies) are the ones that sense low PO2." },
+  { system: "respiratory", difficulty: "hard",
+    question: "Which condition would decrease the diffusing capacity of the lung for carbon monoxide (DLCO)?",
+    options: ["Polycythaemia", "Mild exercise", "Pulmonary haemorrhage", "Pulmonary fibrosis"], correctIndex: 3,
+    explanation: "Fibrosis thickens the alveolar–capillary membrane and reduces surface area, lowering DLCO. Polycythaemia, exercise and alveolar haemorrhage all increase CO uptake." },
+
+  /* --------------------------- MUSCULOSKELETAL --------------------------- */
+  { system: "musculoskeletal", difficulty: "easy",
+    question: "How many bones are in a typical adult human skeleton?",
+    options: ["106", "156", "206", "306"], correctIndex: 2,
+    explanation: "Adults have 206 bones. Babies have more because several bones fuse during development." },
+  { system: "musculoskeletal", difficulty: "easy",
+    question: "Which protein forms the thick filaments of a sarcomere?",
+    options: ["Actin", "Troponin", "Myosin", "Titin"], correctIndex: 2,
+    explanation: "Thick filaments are bundles of myosin II, whose heads form cross-bridges with actin. Thin filaments contain actin, tropomyosin and troponin." },
+  { system: "musculoskeletal", difficulty: "easy",
+    question: "Which is the longest and strongest bone in the human body?",
+    options: ["Tibia", "Femur", "Humerus", "Fibula"], correctIndex: 1,
+    explanation: "The femur is the longest and heaviest bone, and it can bear forces several times body weight during walking and running." },
+  { system: "musculoskeletal", difficulty: "medium",
+    question: "In skeletal muscle, which protein binds Ca2+ to start contraction?",
+    options: ["Myosin heavy chain", "Tropomyosin", "Troponin C", "Titin"], correctIndex: 2,
+    explanation: "Ca2+ binds troponin C, which shifts tropomyosin away from the myosin-binding sites on actin so cross-bridges can form." },
+  { system: "musculoskeletal", difficulty: "medium",
+    question: "What does ATP binding to the myosin head cause in the cross-bridge cycle?",
+    options: ["The power stroke", "Detachment of myosin from actin", "Release of Ca2+ from troponin", "Formation of the cross-bridge"], correctIndex: 1,
+    explanation: "ATP binding lowers myosin’s affinity for actin and releases the head. ATP hydrolysis then re-cocks the head, ready for the next cycle." },
+  { system: "musculoskeletal", difficulty: "medium",
+    question: "Which cell type resorbs bone matrix?",
+    options: ["Osteoblast", "Osteocyte", "Osteoclast", "Chondrocyte"], correctIndex: 2,
+    explanation: "Osteoclasts are multinucleated cells from the monocyte–macrophage lineage. They dissolve mineral with acid and degrade collagen with enzymes, while osteoblasts build new matrix." },
+  { system: "musculoskeletal", difficulty: "hard",
+    question: "During contraction by the sliding filament mechanism, which region of the sarcomere keeps a constant length?",
+    options: ["I band", "H zone", "Distance between adjacent Z-discs", "A band"], correctIndex: 3,
+    explanation: "The A band is the length of the thick filaments, which do not shorten. The I band and H zone narrow, and the Z-discs move closer together." },
+  { system: "musculoskeletal", difficulty: "hard",
+    question: "Why does rigor mortis develop after death?",
+    options: ["Motor neurons keep firing continuously", "ATP is depleted, so myosin heads cannot detach from actin", "Excess acetylcholine accumulates at the end plate", "Troponin denatures and permanently exposes actin"], correctIndex: 1,
+    explanation: "Without ATP the cross-bridges stay locked and the Ca2+ pumps fail, so muscles stiffen. The stiffness fades hours later when muscle proteins start to break down." },
+  { system: "musculoskeletal", difficulty: "hard",
+    question: "Which muscle fibre type has the highest myosin ATPase activity and glycolytic capacity but fatigues quickly?",
+    options: ["Type I", "Type IIa", "Type IIx", "Cardiac fibre"], correctIndex: 2,
+    explanation: "Type IIx fibres contract fast and rely on anaerobic glycolysis with few mitochondria, so they fatigue quickly. Type I fibres are slow, oxidative and fatigue-resistant." }
+];
+</script>
+
+<main class="game">
+  <div class="title">
+    <h1>BIOLOGY LOCKDOWN</h1>
+    <div class="tag">ESCAPE THE LAB</div>
+  </div>
+
+  <header class="hud">
+    <div class="hud-cell">
+      <span class="lbl">LIVES</span>
+      <div id="hearts" role="img" aria-label="Lives: 3 of 3"></div>
+    </div>
+    <div class="hud-cell">
+      <span class="lbl">TIME</span>
+      <div id="timer" role="timer" aria-label="Time remaining">10:00</div>
+    </div>
+    <div class="hud-buttons">
+      <button type="button" id="hintBtn" class="pbtn" aria-label="Use a hint">HINT <span class="pips" id="hintPips" aria-hidden="true"></span></button>
+      <button type="button" id="muteBtn" class="pbtn" aria-pressed="false" aria-label="Mute sound">SOUND ON</button>
+    </div>
+  </header>
+
+  <figure class="scene-wrap" id="sceneWrap">
+    <canvas id="scene" width="160" height="96" role="img" aria-label="A scientist in a lab coat stands in a sealed laboratory."></canvas>
+    <figcaption class="caption" id="caption">THE LAB IS SEALED</figcaption>
+  </figure>
+
+  <ol class="tracker" id="tracker" aria-label="Door progress"></ol>
+
+  <!-- Start -->
+  <section class="panel" id="panelStart" aria-labelledby="startTitle">
+    <h2 id="startTitle">THE LAB DOORS HAVE SEALED</h2>
+    <p class="intro">Only knowledge can set you free. Open five doors, one for each body system.</p>
+    <ul class="rules">
+      <li>Answer 3 questions correctly to open each door.</li>
+      <li>A wrong answer costs a life and swaps in a new question.</li>
+      <li>3 hints per game. Each one removes two wrong answers.</li>
+      <li>The clock pauses while you read an explanation.</li>
+    </ul>
+    <fieldset class="diff">
+      <legend>DIFFICULTY</legend>
+      <label class="diff-opt"><input type="radio" name="diff" value="easy"><span>EASY<small>15:00</small></span></label>
+      <label class="diff-opt"><input type="radio" name="diff" value="medium" checked><span>MEDIUM<small>10:00</small></span></label>
+      <label class="diff-opt"><input type="radio" name="diff" value="hard"><span>HARD<small>6:00</small></span></label>
+    </fieldset>
+    <div class="start-actions"><button type="button" id="startBtn" class="pbtn primary" aria-label="Start the game">START ESCAPE</button></div>
+  </section>
+
+  <!-- Quiz -->
+  <section class="panel" id="panelQuiz" hidden aria-label="Question">
+    <div class="q-meta"><span id="qRoom"></span><span id="qCount"></span></div>
+    <h2 id="qText" tabindex="-1"></h2>
+    <div class="opts" id="opts" role="group" aria-labelledby="qText"></div>
+    <div class="feedback" id="feedback" hidden aria-live="polite">
+      <div class="fb-head" id="fbHead"></div>
+      <p id="fbText"></p>
+      <button type="button" id="nextBtn" class="pbtn primary" aria-label="Continue">CONTINUE &gt;</button>
+    </div>
+  </section>
+
+  <!-- End -->
+  <section class="panel" id="panelEnd" hidden aria-labelledby="endTitle">
+    <h2 id="endTitle"></h2>
+    <p class="end-msg" id="endMsg"></p>
+    <dl class="stats" id="stats"></dl>
+    <div class="rank" id="rankBox" hidden>
+      <span class="lbl">YOUR RANK</span>
+      <div class="rank-name" id="rankName"></div>
+      <p id="rankText"></p>
+    </div>
+    <div class="end-actions">
+      <button type="button" id="againBtn" class="pbtn primary" aria-label="Play again on the same difficulty">PLAY AGAIN</button>
+      <button type="button" id="menuBtn" class="pbtn" aria-label="Back to the start screen">CHANGE DIFFICULTY</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ===================== SETTINGS (edit to rebalance) ===================== */
+  const DIFFICULTIES = {
+    easy:   { label: 'Easy',   seconds: 15 * 60 },
+    medium: { label: 'Medium', seconds: 10 * 60 },
+    hard:   { label: 'Hard',   seconds: 6 * 60 }
+  };
+  const START_LIVES = 3;
+  const START_HINTS = 3;
+  const LOCKS_PER_DOOR = 3;
+
+  /* One entry per door, in play order. "id" must match "system" in the question bank. */
+  const STAGES = [
+    { id: 'circulatory',     name: 'Heart Chamber',        short: 'Heart',   color: '#ff4d6d', dark: '#7a1f33' },
+    { id: 'nervous',         name: 'Neural Network Vault', short: 'Neural',  color: '#b58cff', dark: '#47307a' },
+    { id: 'digestive',       name: 'Digestive Maze',       short: 'Gut',     color: '#ffb347', dark: '#7a4a14' },
+    { id: 'respiratory',     name: 'Respiratory Gate',     short: 'Lungs',   color: '#5cc8ff', dark: '#1d5575' },
+    { id: 'musculoskeletal', name: 'Skeleton Key Room',    short: 'Bone',    color: '#e9e4c9', dark: '#6b6650' }
+  ];
+  const RANKS = [
+    { min: 85, name: 'BIOLOGY MASTER',   text: 'Flawless instincts. The lab staff want to hire you.' },
+    { min: 70, name: 'SENIOR RESEARCHER', text: 'A confident escape with only a few scratches.' },
+    { min: 50, name: 'JUNIOR SCIENTIST',  text: 'You made it out. A little more revision and it gets easier.' },
+    { min: 0,  name: 'LAB INTERN',        text: 'You squeezed through the door. Time to hit the textbooks.' }
+  ];
+
+  /* =============================== STATE =============================== */
+  const game = {
+    phase: 'start',          // start | play | end
+    difficulty: 'medium',
+    stage: 0,                // current door (0-4)
+    qIndex: 0,               // locks opened on the current door (0-3)
+    qPtr: 0,                 // pointer into this door's question queue
+    doorsOpen: 0,
+    lives: START_LIVES,
+    hints: START_HINTS,
+    hintUsed: false,         // hint already used on the current question
+    timeLimit: DIFFICULTIES.medium.seconds,
+    timeLeft: DIFFICULTIES.medium.seconds,
+    score: 0,
+    answered: 0, correct: 0, wrong: 0,
+    queues: [],              // per-door shuffled question lists
+    current: null,           // { q, opts[] } currently on screen
+    awaitingNext: false,     // an answer was given, waiting for Continue
+    busy: false,             // door animation running
+    muted: false
+  };
+
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    hearts: $('hearts'), timer: $('timer'), hintBtn: $('hintBtn'), hintPips: $('hintPips'), muteBtn: $('muteBtn'),
+    scene: $('scene'), sceneWrap: $('sceneWrap'), caption: $('caption'), tracker: $('tracker'),
+    panelStart: $('panelStart'), panelQuiz: $('panelQuiz'), panelEnd: $('panelEnd'),
+    startBtn: $('startBtn'), qRoom: $('qRoom'), qCount: $('qCount'), qText: $('qText'), opts: $('opts'),
+    feedback: $('feedback'), fbHead: $('fbHead'), fbText: $('fbText'), nextBtn: $('nextBtn'),
+    endTitle: $('endTitle'), endMsg: $('endMsg'), stats: $('stats'), rankBox: $('rankBox'), rankName: $('rankName'), rankText: $('rankText'),
+    againBtn: $('againBtn'), menuBtn: $('menuBtn')
+  };
+
+  /* ============================== HELPERS ============================== */
+  const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? ms * 0.3 : ms));
+  const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const RANK_OF = { easy: 0, medium: 1, hard: 2 };
+
+  /* Each door gets its own shuffled queue: questions at the chosen difficulty first, with a
+     little randomness so neighbouring difficulties mix in and every game feels different.
+     Nothing repeats because each door walks down its own queue once. */
+  function buildQueues(diff) {
+    return STAGES.map((st) =>
+      QUESTION_BANK.filter((q) => q.system === st.id)
+        .map((q) => ({ q, k: Math.abs(RANK_OF[q.difficulty] - RANK_OF[diff]) + Math.random() * 1.6 }))
+        .sort((a, b) => a.k - b.k)
+        .map((o) => o.q)
+    );
+  }
+
+  /* ============================== SOUND ============================== */
+  let actx = null;
+  function initAudio() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+    } catch (e) { actx = null; }
+  }
+  function tone(freq, dur, type = 'square', vol = 0.05, delay = 0) {
+    if (game.muted || !actx) return;
+    try {
+      const t = actx.currentTime + delay;
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.03);
+    } catch (e) { /* audio is optional */ }
+  }
+  const sfx = {
+    start()   { tone(392, .09); tone(523, .09, 'square', .05, .09); tone(659, .16, 'square', .05, .18); },
+    correct() { tone(660, .1); tone(880, .18, 'square', .05, .09); },
+    wrong()   { tone(180, .25, 'sawtooth', .06); tone(120, .35, 'sawtooth', .06, .13); },
+    hint()    { tone(740, .08, 'triangle', .07); tone(988, .1, 'triangle', .06, .08); },
+    unlock()  { tone(90, .06, 'square', .08); tone(70, .08, 'square', .08, .12); [523, 659, 784, 1046].forEach((f, i) => tone(f, .14, 'square', .05, .3 + i * .1)); },
+    win()     { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone(f, .16, 'square', .05, i * .12)); },
+    lose()    { [392, 330, 262, 196].forEach((f, i) => tone(f, .28, 'sawtooth', .05, i * .2)); }
+  };
+
+  /* ============================== PIXEL ART ============================== */
+  const SPRITE = [
+    '....KKKKKK....',
+    '...KHHHHHHK...',
+    '..KHHHHHHHHK..',
+    '..KhHHHHHHhK..',
+    '..KHHSSSSHHK..',
+    '..KHSSSSSSHK..',
+    '..KHSESSESHK..',
+    '..KHSESSESHK..',
+    '..KHSSSSSSHK..',
+    '...KHSMMSHK...',
+    '...KHSSSSHK...',
+    '....KSSSSK....',
+    '..KWWTSSTWWK..',
+    '.KWWWTWWTWWWK.',
+    '.KWWWWTTWWWWK.',
+    '.KWwWWWTWWWwK.',
+    '.KWwWWWcWWWwK.',
+    '.KWwWWWWWWWwK.',
+    '.SKWWWWWWWWKS.',
+    '..KWWWWWWWWK..',
+    '..KPPPPPPPPK..',
+    '..KPPPKKPPPK..',
+    '..KPPK..KPPK..',
+    '..KBBK..KBBK..',
+    '.KBBBK..KBBBK.'
+  ];
+  const PAL = {
+    K: '#1a1426', H: '#f5d76e', h: '#d4a437', S: '#f8d7bd', E: '#2f80ff', M: '#d9776e',
+    W: '#f4f8fb', w: '#b4c3d3', T: '#3b4756', c: '#c9d3dc', P: '#35466b', B: '#1d1d2b'
+  };
+
+  const W = 160, H = 96;
+  const g = els.scene.getContext('2d');
+  const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+
+  const scene = { charX: 22, charAlpha: 1, walking: false, doorOpen: 0, bolts: 0, fade: 0, flashA: 0, flashC: '#fff', dim: 0, confetti: null };
+  function resetScene() { Object.assign(scene, { charX: 22, charAlpha: 1, walking: false, doorOpen: 0, bolts: 0, fade: 0, flashA: 0, dim: 0, confetti: null }); }
+  function flash(color) { scene.flashC = color; scene.flashA = 0.55; }
+
+  function wave(id, i, t) {
+    switch (id) {
+      case 'circulatory': { const p = (i + Math.floor(t * 14)) % 19; return [0, 0, 0, 0, 0, 1, 0, -1, 0, 0, -8, 5, -1, 0, 0, 1, 2, 1, 0][p]; }
+      case 'nervous':     return Math.round(Math.sin(i * 1.7 + t * 9) * 2 + Math.sin(i * 0.6 - t * 5) * 3);
+      case 'digestive':   return Math.round(Math.sin(i * 0.35 - t * 3) * 5);
+      case 'respiratory': return Math.round(Math.sin(i * 0.22 - t * 2) * 6);
+      default: { const gate = Math.sin(i * 0.12 + t * 1.5) > 0.2 ? 1 : 0.15; return Math.round(Math.sin(i * 2.9 + t * 30) * 5 * gate); }
+    }
+  }
+  function beaker(x, y, c, t, seed) {
+    R(x + 2, y, 2, 3, '#a8c4cc'); R(x, y + 3, 6, 6, '#a8c4cc'); R(x + 1, y + 5, 4, 3, c);
+    R(x + 2 + (seed % 2), y + 7 - (Math.floor(t * 5 + seed) % 4), 1, 1, '#ffffff');
+  }
+
+  const DX = 118, DY = 16, DW = 32, DH = 48;
+  function drawScene(t) {
+    const st = STAGES[Math.min(game.stage, STAGES.length - 1)];
+    // wall + bricks
+    R(0, 0, W, 64, '#13242b');
+    for (let y = 0; y < 64; y += 8) {
+      R(0, y, W, 1, '#0e1b20');
+      for (let x = (y / 8) % 2 ? 8 : 0; x < W; x += 16) R(x, y, 1, 8, '#0e1b20');
+    }
+    R(0, 0, W, 4, '#0a1216'); R(0, 4, W, 1, st.color);       // ceiling strip in the room's colour
+    R(0, 62, W, 2, '#0a1216');
+    // floor
+    for (let y = 64; y < H; y += 8) for (let x = 0; x < W; x += 8) R(x, y, 8, 8, ((x + y) / 8) % 2 ? '#1a2e35' : '#142429');
+    // shelves, beakers and a skull
+    R(6, 30, 40, 2, '#3b4a52'); R(6, 46, 40, 2, '#3b4a52');
+    beaker(9, 21, st.color, t, 0); beaker(18, 21, '#37f5b5', t, 1); beaker(36, 21, '#ffd166', t, 2);
+    beaker(10, 37, '#5cc8ff', t, 3);
+    R(28, 40, 7, 5, '#e9e4c9'); R(29, 42, 2, 2, '#13242b'); R(32, 42, 2, 2, '#13242b'); R(29, 45, 5, 2, '#e9e4c9');
+    // monitor with a system-specific trace
+    R(54, 14, 42, 26, '#0a1216'); R(56, 16, 38, 22, '#06100f');
+    for (let y = 18; y < 36; y += 6) R(56, y, 38, 1, '#0d2a24');
+    let prev = 0;
+    for (let i = 0; i < 36; i++) {
+      const v = Math.max(-8, Math.min(8, wave(st.id, i, t)));
+      const y0 = 27 + Math.min(prev, v), y1 = 27 + Math.max(prev, v);
+      R(57 + i, y0, 1, Math.max(1, y1 - y0 + 1), st.color);
+      prev = v;
+    }
+    R(58, 41, 3, 1, '#37f5b5'); R(63, 41, 3, 1, '#ffd166');
+    // door
+    const o = scene.doorOpen;
+    R(DX - 3, DY - 3, DW + 6, DH + 3, '#0a1216'); R(DX - 2, DY - 2, DW + 4, DH + 2, '#31464f');
+    R(DX, DY, DW, DH, o > 0 ? '#dffff4' : '#070b0d');
+    if (o > 0) { g.globalAlpha = 0.35; R(DX, DY, DW, DH / 2, '#ffffff'); g.globalAlpha = 1; }
+    const pw = Math.max(3, Math.round(DW * (1 - o * 0.88)));
+    R(DX, DY, pw, DH, st.dark); R(DX + 1, DY + 1, pw - 2, DH - 2, st.color);
+    if (pw > 12) {
+      g.globalAlpha = 0.28; R(DX + 4, DY + 4, pw - 8, 16, '#000'); R(DX + 4, DY + 24, pw - 8, 20, '#000'); g.globalAlpha = 1;
+      R(DX + pw - 11, DY + 20, 8, 10, '#242a2e'); R(DX + pw - 8, DY + 23, 2, 2, '#ffd166'); R(DX + pw - 8, DY + 25, 2, 3, '#ffd166');
+      if (o === 0) for (let i = 0; i < 3; i++) {
+        const by = DY + 8 + i * 14, open = i < scene.bolts;
+        R(DX + pw - 9, by, open ? 6 : 12, 3, open ? '#37f5b5' : '#c9d3dc');
+      }
+    }
+    for (let i = 0; i < 3; i++) R(DX + 6 + i * 9, DY - 9, 6, 4, i < scene.bolts ? '#37f5b5' : '#3a1a22');
+    if (o > 0) { g.globalAlpha = 0.22 * o; for (let yy = 64; yy < H; yy++) R(DX - (yy - 64) * 0.8, yy, DW + (yy - 64) * 1.6, 1, '#dffff4'); g.globalAlpha = 1; }
+    // character
+    const bob = scene.walking ? Math.floor(t * 8) % 2 : (reduceMotion ? 0 : Math.floor(t * 1.6) % 2);
+    const blink = (t % 3.4) > 3.25;
+    const cx = Math.round(scene.charX), cy = 42 - bob;
+    g.globalAlpha = scene.charAlpha;
+    R(cx + 2, 90, 24, 3, 'rgba(0,0,0,0.35)');
+    SPRITE.forEach((row, ry) => { for (let rx = 0; rx < 14; rx++) { let ch = row[rx]; if (ch === '.') continue; if (blink && ch === 'E') ch = 'S'; R(cx + rx * 2, cy + ry * 2, 2, 2, PAL[ch]); } });
+    g.globalAlpha = 1;
+    // confetti
+    if (scene.confetti) scene.confetti.forEach((p) => R(p.x, p.y, 2, 2, p.c));
+    // overlays
+    if (scene.dim > 0) { g.globalAlpha = scene.dim; R(0, 0, W, H, '#2a0610'); g.globalAlpha = 1; }
+    if (scene.flashA > 0) { g.globalAlpha = Math.min(1, scene.flashA); R(0, 0, W, H, scene.flashC); g.globalAlpha = 1; }
+    if (scene.fade > 0) { g.globalAlpha = scene.fade; R(0, 0, W, H, '#000'); g.globalAlpha = 1; }
+  }
+
+  let lastFrame = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - lastFrame) / 1000); lastFrame = now;
+    scene.flashA = Math.max(0, scene.flashA - dt * 2.5);
+    if (scene.confetti) scene.confetti.forEach((p) => { p.y += p.v * dt; p.x += Math.sin(p.y * 0.2 + p.s) * 0.3; if (p.y > H) { p.y = -2; } });
+    drawScene(now / 1000);
+    requestAnimationFrame(loop);
+  }
+
+  function tween(ms, fn) {
+    if (reduceMotion) ms *= 0.25;
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      (function step(now) { const k = Math.min(1, (now - t0) / ms); fn(k); k < 1 ? requestAnimationFrame(step) : resolve(); })(t0);
+    });
+  }
+
+  /* ============================== HUD ============================== */
+  const HEART = ['.XX.XX.', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...'];
+  function heartSVG(full, extraClass = '') {
+    let r = '';
+    HEART.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'X') r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }));
+    if (full) r += '<rect class="hl" x="1" y="1" width="1" height="1"/>';
+    return `<svg viewBox="0 0 7 6" shape-rendering="crispEdges" class="heart ${full ? 'full' : 'empty'} ${extraClass}" aria-hidden="true">${r}</svg>`;
+  }
+  function renderHearts(lostIndex = -1) {
+    els.hearts.innerHTML = Array.from({ length: START_LIVES }, (_, i) => heartSVG(i < game.lives, i === lostIndex ? 'lost' : '')).join('');
+    els.hearts.setAttribute('aria-label', `Lives: ${game.lives} of ${START_LIVES}`);
+  }
+  function renderTimer() {
+    els.timer.textContent = fmtTime(game.timeLeft);
+    els.timer.classList.toggle('warn', game.timeLeft <= 60 && game.timeLeft > 20);
+    els.timer.classList.toggle('crit', game.timeLeft <= 20);
+  }
+  function updateHud() {
+    renderTimer();
+    els.hintPips.innerHTML = Array.from({ length: START_HINTS }, (_, i) => `<span class="pip ${i < game.hints ? '' : 'off'}"></span>`).join('');
+    const can = game.phase === 'play' && !game.busy && !game.awaitingNext && game.hints > 0 && !game.hintUsed && !!game.current;
+    els.hintBtn.disabled = !can;
+    els.hintBtn.setAttribute('aria-label', `Use a hint (key H). Removes two wrong answers. ${game.hints} left.`);
+    els.muteBtn.textContent = game.muted ? 'SOUND OFF' : 'SOUND ON';
+    els.muteBtn.setAttribute('aria-pressed', String(game.muted));
+    els.muteBtn.setAttribute('aria-label', game.muted ? 'Unmute sound' : 'Mute sound');
+  }
+
+  /* ---- Door tracker ---- */
+  function drawDoorIcon(c, st, state) {
+    const x = c.getContext('2d'); x.clearRect(0, 0, 12, 16);
+    const P = (a, b, w, h, col) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    P(0, 0, 12, 16, '#0a1216'); P(1, 1, 10, 15, '#31464f');
+    if (state === 'open') {
+      P(2, 2, 8, 14, '#dffff4'); P(2, 2, 2, 14, st.color); P(2, 2, 1, 14, st.dark);
+    } else {
+      P(2, 2, 8, 14, state === 'current' ? st.color : st.dark);
+      x.globalAlpha = 0.3; P(3, 3, 6, 4, '#000'); P(3, 11, 6, 4, '#000'); x.globalAlpha = 1;
+      P(5, 5, 2, 1, '#c9d3dc'); P(4, 6, 1, 2, '#c9d3dc'); P(7, 6, 1, 2, '#c9d3dc');
+      P(3, 8, 6, 5, '#ffd166'); P(5, 10, 2, 2, '#3a2a00');
+    }
+  }
+  function buildTracker() {
+    els.tracker.innerHTML = '';
+    STAGES.forEach((st) => {
+      const li = document.createElement('li');
+      li.innerHTML = '<canvas width="12" height="16" aria-hidden="true"></canvas><span class="name"></span><span class="dots" aria-hidden="true"><i class="dot"></i><i class="dot"></i><i class="dot"></i></span><span class="sr"></span>';
+      li.querySelector('.name').textContent = st.short;
+      els.tracker.appendChild(li);
+    });
+  }
+  function updateTracker() {
+    STAGES.forEach((st, i) => {
+      const li = els.tracker.children[i];
+      const state = i < game.doorsOpen ? 'open' : (i === game.stage && game.phase === 'play' ? 'current' : 'locked');
+      li.className = 'is-' + state;
+      drawDoorIcon(li.querySelector('canvas'), st, state);
+      const lit = state === 'open' ? LOCKS_PER_DOOR : state === 'current' ? game.qIndex : 0;
+      li.querySelectorAll('.dot').forEach((d, k) => d.classList.toggle('on', k < lit));
+      li.querySelector('.sr').textContent = `Door ${i + 1}, ${st.name}: ${state === 'open' ? 'unlocked' : state === 'current' ? 'in progress, ' + game.qIndex + ' of 3 locks open' : 'locked'}`;
+    });
+  }
+  function setCaption(text, pulse) {
+    els.caption.textContent = text;
+    els.scene.setAttribute('aria-label', text.toLowerCase() + '. A scientist in a lab coat stands in the lab.');
+    els.caption.classList.remove('pulse'); if (pulse) { void els.caption.offsetWidth; els.caption.classList.add('pulse'); }
+  }
+  function stageCaption() { return `ROOM ${game.stage + 1}/5 · ${STAGES[game.stage].name.toUpperCase()}`; }
+
+  /* ============================== GAME FLOW ============================== */
+  function showPanel(which) {
+    els.panelStart.hidden = which !== 'start';
+    els.panelQuiz.hidden = which !== 'quiz';
+    els.panelEnd.hidden = which !== 'end';
+  }
+
+  function startGame() {
+    initAudio();
+    const diff = document.querySelector('input[name="diff"]:checked').value;
+    Object.assign(game, {
+      phase: 'play', difficulty: diff, stage: 0, qIndex: 0, qPtr: 0, doorsOpen: 0,
+      lives: START_LIVES, hints: START_HINTS, hintUsed: false,
+      timeLimit: DIFFICULTIES[diff].seconds, timeLeft: DIFFICULTIES[diff].seconds,
+      score: 0, answered: 0, correct: 0, wrong: 0, current: null,
+      awaitingNext: false, busy: false, queues: buildQueues(diff)
+    });
+    resetScene();
+    showPanel('quiz');
+    setCaption(stageCaption(), true);
+    renderHearts(); updateTracker(); showQuestion();
+    sfx.start();
+  }
+
+  function showQuestion() {
+    const queue = game.queues[game.stage];
+    let q = queue[game.qPtr++];
+    if (!q) q = queue[Math.floor(Math.random() * queue.length)];   // safety net if a door runs out
+    const opts = shuffle(q.options.map((text, i) => ({ text, correct: i === q.correctIndex, elim: false })));
+    game.current = { q, opts };
+    game.awaitingNext = false; game.hintUsed = false;
+    els.qRoom.textContent = STAGES[game.stage].name.toUpperCase();
+    els.qCount.textContent = `LOCK ${game.qIndex + 1} OF ${LOCKS_PER_DOOR}`;
+    els.qText.textContent = q.question;
+    els.opts.replaceChildren(...opts.map((o, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'opt'; b.setAttribute('aria-label', `Answer ${i + 1}: ${o.text}`);
+      const k = document.createElement('span'); k.className = 'key'; k.textContent = i + 1; k.setAttribute('aria-hidden', 'true');
+      const tx = document.createElement('span'); tx.className = 'txt'; tx.textContent = o.text;
+      b.append(k, tx);
+      b.addEventListener('click', () => answer(i));
+      return b;
+    }));
+    els.feedback.hidden = true;
+    els.panelQuiz.classList.remove('shake');
+    updateHud();
+    els.qText.focus({ preventScroll: true });
+  }
+
+  function answer(i) {
+    if (game.phase !== 'play' || game.busy || game.awaitingNext || !game.current) return;
+    const o = game.current.opts[i];
+    if (!o || o.elim) return;
+    game.awaitingNext = true;
+    game.answered++;
+    const btns = [...els.opts.children];
+    const rightIdx = game.current.opts.findIndex((x) => x.correct);
+    btns.forEach((b) => { b.disabled = true; });
+    let head;
+    if (o.correct) {
+      game.correct++; game.qIndex++;
+      game.score += 100 + Math.round(50 * game.timeLeft / game.timeLimit);
+      scene.bolts = game.qIndex;
+      btns[i].classList.add('correct');
+      flash('#58ff8a'); sfx.correct();
+      head = game.qIndex >= LOCKS_PER_DOOR ? 'CORRECT! FINAL LOCK RELEASED' : `CORRECT! LOCK ${game.qIndex} OF ${LOCKS_PER_DOOR} OPEN`;
+    } else {
+      game.wrong++; game.lives--;
+      btns[i].classList.add('wrong'); btns[rightIdx].classList.add('correct');
+      flash('#ff4d6d'); sfx.wrong();
+      void els.panelQuiz.offsetWidth; els.panelQuiz.classList.add('shake');
+      renderHearts(game.lives);
+      head = game.lives > 0 ? 'WRONG! YOU LOST A LIFE' : 'WRONG! NO LIVES LEFT';
+    }
+    els.feedback.className = 'feedback ' + (o.correct ? 'good' : 'bad');
+    els.fbHead.textContent = head;
+    els.fbText.textContent = (o.correct ? '' : `Correct answer: ${game.current.opts[rightIdx].text}. `) + game.current.q.explanation;
+    els.nextBtn.textContent = game.lives <= 0 ? 'SEE RESULT >' : (game.qIndex >= LOCKS_PER_DOOR ? 'OPEN THE DOOR >' : 'CONTINUE >');
+    els.nextBtn.disabled = false;
+    els.feedback.hidden = false;
+    updateHud(); updateTracker();
+    els.nextBtn.focus({ preventScroll: true });
+    els.feedback.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  function useHint() {
+    if (game.phase !== 'play' || game.busy || game.awaitingNext || game.hints <= 0 || game.hintUsed || !game.current) return;
+    const wrongIdx = game.current.opts.map((_, i) => i).filter((i) => !game.current.opts[i].correct && !game.current.opts[i].elim);
+    shuffle(wrongIdx).slice(0, 2).forEach((i) => {
+      game.current.opts[i].elim = true;
+      const b = els.opts.children[i];
+      b.classList.add('elim'); b.disabled = true;
+      b.setAttribute('aria-label', b.getAttribute('aria-label') + ' (removed by hint)');
+    });
+    game.hints--; game.hintUsed = true;
+    sfx.hint(); updateHud();
+  }
+
+  async function onNext() {
+    if (game.phase !== 'play' || !game.awaitingNext || game.busy) return;
+    if (game.lives <= 0) { endGame(false, 'lives'); return; }
+    if (game.qIndex >= LOCKS_PER_DOOR) { await unlockDoor(); return; }
+    showQuestion();
+  }
+
+  async function unlockDoor() {
+    game.busy = true; els.nextBtn.disabled = true; updateHud();
+    els.fbHead.textContent = 'THE LOCKS CLICK OPEN...';
+    sfx.unlock();
+    await sleep(450);
+    await tween(900, (k) => { scene.doorOpen = k; });
+    game.doorsOpen = game.stage + 1; updateTracker();
+    const last = game.stage === STAGES.length - 1;
+    scene.walking = true;
+    if (last) {
+      await tween(1100, (k) => { scene.charX = 22 + (84 - 22) * k; });
+      scene.walking = false;
+      scene.confetti = Array.from({ length: 50 }, () => ({ x: Math.random() * W, y: Math.random() * H, v: 20 + Math.random() * 30, s: Math.random() * 6, c: ['#37f5b5', '#ffd166', '#ff4d6d', '#5cc8ff', '#ffffff'][Math.floor(Math.random() * 5)] }));
+      flash('#ffffff');
+      await sleep(900);
+      game.busy = false; endGame(true);
+      return;
+    }
+    await tween(1300, (k) => { scene.charX = 22 + (104 - 22) * k; scene.charAlpha = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4; });
+    scene.walking = false;
+    await tween(350, (k) => { scene.fade = k; });
+    game.stage++; game.qIndex = 0; game.qPtr = 0;
+    Object.assign(scene, { charX: 22, charAlpha: 1, doorOpen: 0, bolts: 0 });
+    setCaption(stageCaption(), true);
+    updateTracker();
+    await tween(350, (k) => { scene.fade = 1 - k; });
+    game.busy = false;
+    showQuestion();
+  }
+
+  function endGame(win, reason) {
+    game.phase = 'end'; game.busy = false; game.awaitingNext = false;
+    showPanel('end');
+    const used = Math.round(game.timeLimit - game.timeLeft);
+    const acc = game.answered ? Math.round(100 * game.correct / game.answered) : 0;
+    const hintsUsed = START_HINTS - game.hints;
+    const rating = Math.max(0, Math.round(100 - game.wrong * 12 - hintsUsed * 4 - (used / game.timeLimit) * 30));
+    const stat = (label, valueHTML) => `<div class="stat"><dt>${label}</dt><dd>${valueHTML}</dd></div>`;
+    const hearts = Array.from({ length: START_LIVES }, (_, i) => heartSVG(i < game.lives)).join('');
+    let html = stat('TIME TAKEN', fmtTime(used)) + stat('LIVES LEFT', hearts) + stat('HINTS USED', String(hintsUsed)) + stat('ACCURACY', acc + '%') + stat('SCORE', String(game.score));
+    if (win) {
+      els.endTitle.textContent = 'ESCAPED!';
+      els.endMsg.textContent = `All five doors are open. You walked out of the lab on ${DIFFICULTIES[game.difficulty].label} difficulty.`;
+      const rk = RANKS.find((r) => rating >= r.min);
+      els.rankName.textContent = rk.name; els.rankText.textContent = rk.text; els.rankBox.hidden = false;
+      setCaption('FREEDOM! ALL DOORS OPEN'); sfx.win();
+    } else {
+      els.endTitle.textContent = reason === 'time' ? 'TIME’S UP' : 'GAME OVER';
+      els.endMsg.textContent = (reason === 'time' ? 'The clock ran out.' : 'You ran out of lives.') + ' The lab stays sealed. Try again with fresh questions.';
+      html += stat('DOORS OPENED', `${game.doorsOpen} / ${STAGES.length}`);
+      els.rankBox.hidden = true;
+      scene.dim = 0.45; setCaption('LOCKED IN'); sfx.lose();
+    }
+    els.stats.innerHTML = html;
+    updateHud(); updateTracker();
+    els.againBtn.focus({ preventScroll: true });
+    els.panelEnd.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  function toMenu() {
+    game.phase = 'start'; game.doorsOpen = 0; game.stage = 0; game.qIndex = 0; game.current = null;
+    game.lives = START_LIVES; game.hints = START_HINTS;
+    const diff = document.querySelector('input[name="diff"]:checked').value;
+    game.timeLimit = game.timeLeft = DIFFICULTIES[diff].seconds;
+    resetScene(); showPanel('start'); setCaption('THE LAB IS SEALED');
+    renderHearts(); updateTracker(); updateHud();
+    els.startBtn.focus({ preventScroll: true });
+  }
+
+  /* ============================== EVENTS ============================== */
+  els.startBtn.addEventListener('click', startGame);
+  els.nextBtn.addEventListener('click', onNext);
+  els.hintBtn.addEventListener('click', useHint);
+  els.againBtn.addEventListener('click', startGame);
+  els.menuBtn.addEventListener('click', toMenu);
+  els.muteBtn.addEventListener('click', () => { game.muted = !game.muted; initAudio(); updateHud(); });
+  document.querySelectorAll('input[name="diff"]').forEach((r) => r.addEventListener('change', () => {
+    if (game.phase !== 'start') return;
+    game.timeLimit = game.timeLeft = DIFFICULTIES[r.value].seconds; renderTimer();
+  }));
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || game.phase !== 'play') return;
+    if (e.key >= '1' && e.key <= '4') { e.preventDefault(); answer(Number(e.key) - 1); }
+    else if (e.key === 'h' || e.key === 'H') { useHint(); }
+    else if ((e.key === 'Enter' || e.key === ' ') && game.awaitingNext && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); onNext(); }
+  });
+
+  /* Countdown. It only runs while a question is waiting for an answer. */
+  let lastTick = performance.now();
+  setInterval(() => {
+    const now = performance.now(), dt = (now - lastTick) / 1000; lastTick = now;
+    if (game.phase === 'play' && !game.busy && !game.awaitingNext) {
+      game.timeLeft = Math.max(0, game.timeLeft - dt);
+      renderTimer();
+      if (game.timeLeft <= 0) endGame(false, 'time');
+    }
+  }, 200);
+
+  /* ============================== BOOT ============================== */
+  buildTracker(); renderHearts(); updateTracker(); updateHud();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
